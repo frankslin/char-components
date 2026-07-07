@@ -12,27 +12,28 @@ Regenerates:
     data/dt.jsonl   -- one JSON string per line; line N (0-indexed) == dt[N]
     data/rt.jsonl   -- one JSON string per line; line N (0-indexed) == rt[N]
     data/vt.json    -- single JSON object, insertion order preserved
+    data/kt.json    -- single JSON array, insertion order preserved (component keypad categories)
 
-See data/README.md for what these three tables mean and known caveats.
+See data/README.md for what these tables mean and known caveats.
 """
 import json
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-HTM_PATH = ROOT / "部件檢索.htm"
+HTM_PATH = ROOT / "legacy" / "部件檢索.htm"
 OUT_DIR = Path(__file__).resolve().parent
 
 
-def extract_literal(script, var_name):
+def extract_literal(text, var_name):
     marker = f"var {var_name}="
-    i = script.find(marker)
+    i = text.find(marker)
     if i < 0:
         raise SystemExit(f"could not find `{marker}` in {HTM_PATH}")
     start = i + len(marker)
     decoder = json.JSONDecoder()
-    value, end = decoder.raw_decode(script, start)
-    tail = script[end:end + 1]
+    value, end = decoder.raw_decode(text, start)
+    tail = text[end:end + 1]
     if tail != ";":
         raise SystemExit(
             f"unexpected character after {var_name} literal: {tail!r} "
@@ -49,11 +50,14 @@ def main():
         raise SystemExit(f"could not find marker {marker!r} in {HTM_PATH}")
     script_start = html.find("<script", idx)
     script_end = html.find("</script>", script_start)
-    script = html[script_start:script_end]
+    core_script = html[script_start:script_end]
 
-    dt = extract_literal(script, "dt")
-    rt = extract_literal(script, "rt")
-    vt = extract_literal(script, "vt")
+    dt = extract_literal(core_script, "dt")
+    rt = extract_literal(core_script, "rt")
+    vt = extract_literal(core_script, "vt")
+    # kt (component keypad categories) lives in the UI/customization region,
+    # not the core script blob above -- search the whole file for it.
+    kt = extract_literal(html, "kt")
 
     if len(dt) != len(rt):
         raise SystemExit(f"dt ({len(dt)}) and rt ({len(rt)}) length mismatch")
@@ -75,9 +79,15 @@ def main():
         json.dumps(vt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
 
+    kt_path = OUT_DIR / "kt.json"
+    kt_path.write_text(
+        json.dumps(kt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
     print(f"dt: {len(dt)} entries -> {dt_path}", file=sys.stderr)
     print(f"rt: {len(rt)} entries -> {rt_path}", file=sys.stderr)
     print(f"vt: {len(vt)} entries -> {vt_path}", file=sys.stderr)
+    print(f"kt: {len(kt)} entries -> {kt_path}", file=sys.stderr)
 
 
 if __name__ == "__main__":

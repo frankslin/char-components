@@ -38,19 +38,20 @@
 
 ### Phase 1 — 資料抽離 ✅ 已完成
 
-- `dt`/`rt`/`vt` 已抽成 `data/dt.jsonl`、`data/rt.jsonl`、`data/vt.json`，`data/extract.py` 可重新從 `legacy/部件檢索.htm` 產生，並已用逐項比對驗證完全等價。
+- `dt`/`rt`/`vt`/`kt` 已抽成 `data/dt.jsonl`、`data/rt.jsonl`、`data/vt.json`、`data/kt.json`，`data/extract.py` 可重新從 `legacy/部件檢索.htm` 產生，並已用逐項比對驗證完全等價。
 - `GetBlock`/`GetIndex` 手刻的 Unicode 區塊偏移量**尚未**生成式化，仍是原樣搬進 `web/core.js`(見 Phase 4 待辦)。
 
-### Phase 2 — 新前端實作(no-build) ✅ 初版已完成，見 `web/README.md` 的待補清單
+### Phase 2 — 新前端實作(no-build) ✅ 已完成部件鍵盤／即時查詢／字源圖例，見 `web/README.md` 的待補清單
 
 - 沒有走原計畫的「建置腳本組裝回單一 htm」路線——改成 `web/` 這個免建置的多檔案靜態實作，直接用 `<script type="module">` + `fetch()` 讀取 `data/`。決策原因：使用者只需要「部署後點開能用」，不需要保留單一 htm 產出。
-- `web/core.js` 的演算法已用 Node 腳本（比對「日月/明/日日月/日明」等黃金案例）與 Playwright 驅動真實瀏覽器（載入頁面、輸入查詢、點字複製、`\字` 解構、包容異體勾選）雙重驗證過，行為與 `legacy/部件檢索.htm` 一致。
-- 尚未搬過來的功能列在 `web/README.md`(部件鍵盤、異體檢索 UI、選項記憶、外部字典跳轉、資料按需分片)——之後要加功能前先看那份清單，避免重複造輪子或誤以為是遺漏而重新分析。
+- `web/core.js` 的演算法已用 Node 腳本（比對「日月/明/日日月/日明」等黃金案例）與 Playwright 驅動真實瀏覽器（載入頁面、輸入查詢、點字複製、`\字` 解構、包容異體勾選、側邊鍵盤插入、字源圖例篩選）雙重驗證過，行為與 `legacy/部件檢索.htm` 一致。
+- 側邊部件鍵盤(`web/keypad.js`)、即時查詢(自動完成，debounce + IME 感知)、字源圖例(`web/blocks.js`，14 分類、可點擊插入篩選符號、結果依字源上色、補充字 PUA 提示與正式編碼字分開顯示)都已實作完成。
+- 尚未搬過來的功能列在 `web/README.md`(異體檢索 UI、選項記憶、外部字典跳轉、資料按需分片)——之後要加功能前先看那份清單，避免重複造輪子或誤以為是遺漏而重新分析。
 
 ### Phase 3 — UI 現代化(可與 Phase 2 後續功能穿插進行)
 
 - `web/` 已經是 `localStorage`-友善的乾淨 DOM 組裝（無 cookie、無字串拼接 HTML），這部分不用再做。
-- 待補：深色模式已有雛形(`prefers-color-scheme`)，部件鍵盤的響應式排版還沒做(因為部件鍵盤本身還沒搬過來)。
+- 深色模式(`prefers-color-scheme`)、側邊鍵盤面板的響應式排版(窄螢幕自動收合)都已完成。
 - **不要引入 React/Vue 等框架**——no-build、零依賴是 `web/` 的核心約束，不是技術債。
 
 ### Phase 4 — 尚未排期

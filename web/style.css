@@ -10,6 +10,10 @@
   --fuzzy: #444444;
   --regu: #b5560c;
   --accent: #1257f9;
+  --blk-bg-s: 70%;
+  --blk-bg-l: 93%;
+  --blk-border-s: 60%;
+  --blk-border-l: 45%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,8 +26,29 @@
     --fuzzy: #cfcfcf;
     --regu: #f0a35e;
     --accent: #7aa2ff;
+    --blk-bg-s: 35%;
+    --blk-bg-l: 22%;
+    --blk-border-s: 55%;
+    --blk-border-l: 62%;
   }
 }
+
+/* 14 個字源分類的色相，均分在色相環上；文字標籤(圖例/hover title)才是主要辨識依據，
+   顏色只是輔助線索，避免色弱使用者只能靠顏色判斷。 */
+.blk-bmp { --blk-h: 0; }
+.blk-exa { --blk-h: 26; }
+.blk-exb { --blk-h: 51; }
+.blk-exc { --blk-h: 77; }
+.blk-exd { --blk-h: 103; }
+.blk-exe { --blk-h: 129; }
+.blk-exf { --blk-h: 154; }
+.blk-exg { --blk-h: 180; }
+.blk-exh { --blk-h: 206; }
+.blk-exi { --blk-h: 231; }
+.blk-exj { --blk-h: 257; }
+.blk-cmp { --blk-h: 283; }
+.blk-sup { --blk-h: 309; }
+.blk-oth { --blk-h: 334; }
 
 * { box-sizing: border-box; }
 
@@ -41,7 +66,7 @@ body {
 
 header {
   width: 100%;
-  max-width: 48rem;
+  max-width: 64rem;
   margin-bottom: 1rem;
 }
 
@@ -56,9 +81,17 @@ h1 {
   margin: 0;
 }
 
-.panel {
+.layout {
   width: 100%;
-  max-width: 48rem;
+  max-width: 64rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.panel {
+  flex: 1 1 32rem;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   padding: 1rem;
@@ -116,9 +149,39 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 #output {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 0.35rem;
   min-height: 3rem;
 }
+
+.truncated-note {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding-top: 0.25rem;
+}
+
+/* 字源圖例：點擊插入「只搜此區」篩選符號 */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.legend-chip {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: hsl(var(--blk-h) var(--blk-bg-s) var(--blk-bg-l));
+  border: 1px solid hsl(var(--blk-h) var(--blk-border-s) var(--blk-border-l));
+  color: hsl(var(--blk-h) var(--blk-border-s) calc(var(--blk-border-l) - 15%));
+}
+
+@media (prefers-color-scheme: dark) {
+  .legend-chip { color: hsl(var(--blk-h) var(--blk-border-s) calc(var(--blk-border-l) + 15%)); }
+}
+
+.legend-chip:hover { border-color: var(--accent); color: var(--accent); }
 
 .char-chip {
   font-family: 'WFG FSung', serif;
@@ -127,11 +190,13 @@ button:hover { border-color: var(--accent); color: var(--accent); }
   padding: 0.35rem 0.5rem;
   border-radius: 0.4rem;
   border: 1px solid var(--border);
-  background: var(--bg);
+  border-left-width: 4px;
+  background: hsl(var(--blk-h) var(--blk-bg-s) var(--blk-bg-l));
+  border-left-color: hsl(var(--blk-h) var(--blk-border-s) var(--blk-border-l));
   cursor: pointer;
 }
 
-.char-chip.hit-exact { color: var(--exact); border-color: var(--exact); }
+.char-chip.hit-exact { color: var(--exact); border-color: var(--exact); border-left-color: hsl(var(--blk-h) var(--blk-border-s) var(--blk-border-l)); }
 .char-chip.hit-fuzzy { color: var(--fuzzy); }
 .char-chip.hit-regu0 { color: var(--muted); border-style: dashed; }
 .char-chip.hit-regu1 { color: var(--regu); border-color: var(--regu); font-weight: 600; }
@@ -146,6 +211,79 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 .tree-text {
   font-family: 'WFG FSung', serif;
   font-size: 1.1rem;
+}
+
+/* 側邊部件鍵盤面板 */
+.side-panel {
+  flex: 0 0 16rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 40rem;
+}
+
+.side-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.side-panel-header button {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.keypad {
+  display: flex;
+  gap: 0.5rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.side-panel.collapsed .keypad { display: none; }
+
+.keypad-tabs {
+  flex: 0 0 2.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  overflow-y: auto;
+  max-height: 38rem;
+}
+
+.keypad-tab {
+  padding: 0.3rem;
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.keypad-tab.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--bg)); }
+
+.keypad-grid {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  max-height: 38rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.keypad-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.keypad-key {
+  font-family: 'WFG FSung', serif;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0.25rem 0.4rem;
 }
 
 #toast {
@@ -167,10 +305,17 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 
 footer {
   width: 100%;
-  max-width: 48rem;
+  max-width: 64rem;
   margin-top: 1.5rem;
   font-size: 0.8rem;
   color: var(--muted);
 }
 
 footer a { color: var(--accent); }
+
+/* 窄螢幕：側邊鍵盤面板改到主面板下方，且收起時只留標題列 */
+@media (max-width: 56rem) {
+  .layout { flex-direction: column; }
+  .side-panel { flex: 1 1 auto; width: 100%; max-height: none; }
+  .keypad-tabs, .keypad-grid { max-height: 16rem; }
+}
