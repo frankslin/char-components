@@ -218,16 +218,24 @@ button:hover { border-color: var(--accent); color: var(--accent); }
   font-size: 1.1rem;
 }
 
-/* 側邊部件鍵盤面板：所有分類一次列出，不用切換分頁 */
+/* 側邊部件鍵盤面板：所有分類一次列出，不用切換分頁。
+   佔滿視窗高度並固定在畫面上(sticky)，內部才是真正可滾動的區域——
+   之前用 CSS multi-column(column-width) 排版，溢出的內容會往「右邊多長
+   一欄」而不是往下，但外層只開了 overflow-y，導致多出來的欄位被裁掉、
+   永遠滾不到。改用 CSS Grid 讓內容單純往下折行，搭配 flex:1+min-height:0
+   這組標準寫法才能讓 overflow-y:auto 真正生效。 */
 .side-panel {
-  flex: 0 0 26rem;
+  flex: 0 0 28rem;
+  position: sticky;
+  top: 1.5rem;
+  align-self: flex-start;
+  height: calc(100vh - 3rem);
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  max-height: 44rem;
 }
 
 .side-panel-header {
@@ -236,6 +244,7 @@ button:hover { border-color: var(--accent); color: var(--accent); }
   justify-content: space-between;
   font-size: 0.9rem;
   color: var(--muted);
+  flex: 0 0 auto;
 }
 
 .side-panel-header button {
@@ -244,21 +253,24 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 }
 
 .keypad {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
 
 .side-panel.collapsed .keypad { display: none; }
+.side-panel.collapsed { height: auto; }
 
 .keypad-grid {
   height: 100%;
   overflow-y: auto;
-  column-width: 11rem;
-  column-gap: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0 1rem;
+  align-content: start;
 }
 
 .keypad-cat {
-  break-inside: avoid;
   margin-bottom: 0.75rem;
 }
 
@@ -319,6 +331,12 @@ footer a { color: var(--accent); }
 /* 窄螢幕：側邊鍵盤面板改到主面板下方，且收起時只留標題列 */
 @media (max-width: 56rem) {
   .layout { flex-direction: column; }
-  .side-panel { flex: 1 1 auto; width: 100%; max-height: none; }
-  .keypad-grid { max-height: 20rem; column-width: 9rem; }
+  .side-panel {
+    flex: 1 1 auto;
+    width: 100%;
+    position: static;
+    height: 24rem;
+  }
+  .side-panel.collapsed { height: auto; }
+  .keypad-grid { grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); }
 }
