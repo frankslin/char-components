@@ -10,9 +10,9 @@
   --fuzzy: #444444;
   --regu: #b5560c;
   --accent: #1257f9;
-  --blk-bg-s: 70%;
-  --blk-bg-l: 93%;
-  --blk-border-s: 60%;
+  --blk-bg-s: 62%;
+  --blk-bg-l: 87%;
+  --blk-border-s: 55%;
   --blk-border-l: 45%;
 }
 
@@ -26,10 +26,10 @@
     --fuzzy: #cfcfcf;
     --regu: #f0a35e;
     --accent: #7aa2ff;
-    --blk-bg-s: 35%;
-    --blk-bg-l: 22%;
-    --blk-border-s: 55%;
-    --blk-border-l: 62%;
+    --blk-bg-s: 38%;
+    --blk-bg-l: 24%;
+    --blk-border-s: 50%;
+    --blk-border-l: 60%;
   }
 }
 
@@ -183,23 +183,28 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 
 .legend-chip:hover { border-color: var(--accent); color: var(--accent); }
 
+.legend-note {
+  margin: -0.3rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .char-chip {
   font-family: 'WFG FSung', serif;
   font-size: 1.6rem;
   line-height: 1;
   padding: 0.35rem 0.5rem;
-  border-radius: 0.4rem;
-  border: 1px solid var(--border);
-  border-left-width: 4px;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--blk-h) var(--blk-border-s) var(--blk-border-l));
   background: hsl(var(--blk-h) var(--blk-bg-s) var(--blk-bg-l));
-  border-left-color: hsl(var(--blk-h) var(--blk-border-s) var(--blk-border-l));
+  color: var(--fg);
   cursor: pointer;
 }
 
-.char-chip.hit-exact { color: var(--exact); border-color: var(--exact); border-left-color: hsl(var(--blk-h) var(--blk-border-s) var(--blk-border-l)); }
-.char-chip.hit-fuzzy { color: var(--fuzzy); }
+.char-chip.hit-exact { font-weight: 600; color: var(--exact); }
+.char-chip.hit-fuzzy { color: var(--fg); }
 .char-chip.hit-regu0 { color: var(--muted); border-style: dashed; }
-.char-chip.hit-regu1 { color: var(--regu); border-color: var(--regu); font-weight: 600; }
+.char-chip.hit-regu1 { font-weight: 600; color: var(--regu); }
 
 .tree-row {
   display: flex;
@@ -213,16 +218,16 @@ button:hover { border-color: var(--accent); color: var(--accent); }
   font-size: 1.1rem;
 }
 
-/* 側邊部件鍵盤面板 */
+/* 側邊部件鍵盤面板：所有分類一次列出，不用切換分頁 */
 .side-panel {
-  flex: 0 0 16rem;
+  flex: 0 0 26rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  max-height: 40rem;
+  max-height: 44rem;
 }
 
 .side-panel-header {
@@ -239,44 +244,41 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 }
 
 .keypad {
-  display: flex;
-  gap: 0.5rem;
   min-height: 0;
   overflow: hidden;
 }
 
 .side-panel.collapsed .keypad { display: none; }
 
-.keypad-tabs {
-  flex: 0 0 2.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  overflow-y: auto;
-  max-height: 38rem;
-}
-
-.keypad-tab {
-  padding: 0.3rem;
-  font-size: 1.1rem;
-  line-height: 1.2;
-}
-
-.keypad-tab.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--bg)); }
-
 .keypad-grid {
-  flex: 1 1 auto;
+  height: 100%;
   overflow-y: auto;
-  max-height: 38rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  column-width: 11rem;
+  column-gap: 1rem;
 }
+
+.keypad-cat {
+  break-inside: avoid;
+  margin-bottom: 0.75rem;
+}
+
+.keypad-cat-title {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0 0 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.keypad-cat-icon { font-size: 1rem; }
 
 .keypad-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.2rem;
+  margin-bottom: 0.2rem;
 }
 
 .keypad-key {
@@ -284,6 +286,7 @@ button:hover { border-color: var(--accent); color: var(--accent); }
   font-size: 1.2rem;
   line-height: 1;
   padding: 0.25rem 0.4rem;
+  border-radius: 0.5rem;
 }
 
 #toast {
@@ -317,5 +320,5 @@ footer a { color: var(--accent); }
 @media (max-width: 56rem) {
   .layout { flex-direction: column; }
   .side-panel { flex: 1 1 auto; width: 100%; max-height: none; }
-  .keypad-tabs, .keypad-grid { max-height: 16rem; }
+  .keypad-grid { max-height: 20rem; column-width: 9rem; }
 }

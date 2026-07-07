@@ -7,6 +7,18 @@ const LIVE_MAX_RESULTS = 100;
 const FULL_MAX_RESULTS = 3000;
 const LIVE_DEBOUNCE_MS = 120;
 
+// 使用者若完全沒有自己指定「只搜某區」的篩選符號，預設排除「相容」(相容表意文字)，
+// 其餘區塊都搜。要看相容字就自己點一下圖例的「相容」——一旦輸入裡出現任何篩選符號，
+// 就完全照使用者指定的來，不再套用這個預設值(語意對應 core.js 的 arrayalize()：
+// 只要偵測到任何旗標字元，blkFlag 就不會落到「全部搜」的預設分支)。
+const BLOCK_FLAG_CHARS = new Set(BLOCKS.map((b) => b.flag));
+const DEFAULT_FLAGS = BLOCKS.filter((b) => b.cls !== 'cmp').map((b) => b.flag).join('');
+
+function hasBlockFlag(s) {
+  for (const ch of s) if (BLOCK_FLAG_CHARS.has(ch)) return true;
+  return false;
+}
+
 const els = {
   input: document.getElementById('input'),
   search: document.getElementById('search'),
@@ -20,7 +32,6 @@ const els = {
   status: document.getElementById('status'),
   toast: document.getElementById('toast'),
   legend: document.getElementById('legend'),
-  keypadTabs: document.getElementById('keypad-tabs'),
   keypadGrid: document.getElementById('keypad-grid'),
   sidePanel: document.getElementById('side-panel'),
   togglePanel: document.getElementById('toggle-panel'),
@@ -120,16 +131,24 @@ function buildLegend() {
   }
 }
 
+// 一次列出所有分類，不用切換分頁——沿用 legacy/部件檢索.htm 的原始設計
+// （原版是一張表，每個分類各佔一欄，全部同時可見），只是改成多欄流式排版
+// 而不是固定欄位的表格，比較適合響應式版面。
 function buildKeypad(categories) {
-  els.keypadTabs.replaceChildren();
   els.keypadGrid.replaceChildren();
+  const frag = document.createDocumentFragment();
+  for (const cat of categories) {
+    const section = document.createElement('section');
+    section.className = 'keypad-cat';
 
-  function showCategory(idx) {
-    for (const child of els.keypadTabs.children) {
-      child.classList.toggle('active', Number(child.dataset.idx) === idx);
-    }
-    els.keypadGrid.replaceChildren();
-    const cat = categories[idx];
+    const title = document.createElement('h3');
+    title.className = 'keypad-cat-title';
+    const icon = document.createElement('span');
+    icon.className = 'keypad-cat-icon';
+    icon.textContent = cat.icon;
+    title.append(icon, document.createTextNode(cat.name));
+    section.appendChild(title);
+
     for (const row of cat.rows) {
       const rowEl = document.createElement('div');
       rowEl.className = 'keypad-row';
@@ -144,22 +163,11 @@ function buildKeypad(categories) {
         });
         rowEl.appendChild(btn);
       }
-      els.keypadGrid.appendChild(rowEl);
+      section.appendChild(rowEl);
     }
+    frag.appendChild(section);
   }
-
-  categories.forEach((cat, idx) => {
-    const tab = document.createElement('button');
-    tab.type = 'button';
-    tab.className = 'keypad-tab';
-    tab.dataset.idx = String(idx);
-    tab.title = cat.name;
-    tab.textContent = cat.icon;
-    tab.addEventListener('click', () => showCategory(idx));
-    els.keypadTabs.appendChild(tab);
-  });
-
-  if (categories.length) showCategory(0);
+  els.keypadGrid.appendChild(frag);
 }
 
 let matcher;
@@ -183,7 +191,8 @@ function doSearch(max) {
   }
   const v = els.variant.checked;
   const u = els.ucodeOnly.checked;
-  const hits = matcher.getMatch(raw, v, d, u, max);
+  const query = hasBlockFlag(raw) ? raw : DEFAULT_FLAGS + raw;
+  const hits = matcher.getMatch(query, v, d, u, max);
   const truncated = hits.length > max;
   const shown = truncated ? hits.filter((h) => h.hit === 0 || hits.indexOf(h) < max) : hits;
   renderHits(shown, truncated);
