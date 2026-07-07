@@ -3,54 +3,65 @@
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
-  --fg: #1a1a1a;
-  --muted: #6b6b6b;
-  --border: #d8d8d8;
-  --exact: #1a7f37;
-  --fuzzy: #444444;
-  --regu: #b5560c;
-  --accent: #1257f9;
-  --blk-bg-s: 62%;
-  --blk-bg-l: 87%;
-  --blk-border-s: 55%;
-  --blk-border-l: 45%;
+  --bg-subtle: #f9fafb;
+  --fg: #111827;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --accent: #2563eb;
+  --exact: #15803d;
+  --regu: #b45309;
+  /* 字源色：低飽和的淺色底 + 同色系虛線框，dot 用稍深一級的同色 */
+  --blk-s: 30%;
+  --blk-bg-l: 93%;
+  --blk-border-l: 72%;
+  --blk-dot-l: 60%;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #16181c;
-    --fg: #eaeaea;
-    --muted: #9a9a9a;
-    --border: #3a3d42;
-    --exact: #6fd88a;
-    --fuzzy: #cfcfcf;
-    --regu: #f0a35e;
+    --bg-subtle: #1d2026;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #2e3238;
+    --border-strong: #3f444c;
     --accent: #7aa2ff;
-    --blk-bg-s: 38%;
-    --blk-bg-l: 24%;
-    --blk-border-s: 50%;
-    --blk-border-l: 60%;
+    --exact: #6fd88a;
+    --regu: #f0a35e;
+    --blk-s: 25%;
+    --blk-bg-l: 21%;
+    --blk-border-l: 38%;
+    --blk-dot-l: 55%;
   }
 }
 
-/* 14 個字源分類的色相，均分在色相環上；文字標籤(圖例/hover title)才是主要辨識依據，
-   顏色只是輔助線索，避免色弱使用者只能靠顏色判斷。 */
-.blk-bmp { --blk-h: 0; }
-.blk-exa { --blk-h: 26; }
-.blk-exb { --blk-h: 51; }
-.blk-exc { --blk-h: 77; }
-.blk-exd { --blk-h: 103; }
-.blk-exe { --blk-h: 129; }
-.blk-exf { --blk-h: 154; }
-.blk-exg { --blk-h: 180; }
-.blk-exh { --blk-h: 206; }
-.blk-exi { --blk-h: 231; }
-.blk-exj { --blk-h: 257; }
-.blk-cmp { --blk-h: 283; }
-.blk-sup { --blk-h: 309; }
-.blk-oth { --blk-h: 334; }
+/* 13 個字源分類的色相（「基本」區佔絕大多數結果，一律中性不上色，
+   避免整片結果變成彩虹；「相容」區預設不顯示，不需要顏色）。
+   文字標籤(圖例/hover title)才是主要辨識依據，顏色只是輔助線索。 */
+.blk-exa { --blk-h: 24; }
+.blk-exb { --blk-h: 48; }
+.blk-exc { --blk-h: 72; }
+.blk-exd { --blk-h: 96; }
+.blk-exe { --blk-h: 130; }
+.blk-exf { --blk-h: 165; }
+.blk-exg { --blk-h: 190; }
+.blk-exh { --blk-h: 215; }
+.blk-exi { --blk-h: 245; }
+.blk-exj { --blk-h: 275; }
+.blk-cmp { --blk-h: 305; }
+.blk-sup { --blk-h: 330; }
+.blk-oth { --blk-h: 0; }
 
 * { box-sizing: border-box; }
+
+/* .options label 的 display:flex 會蓋掉 hidden 屬性的預設 display:none，
+   這裡把 hidden 的優先權拉回來(依模式顯示選項用) */
+[hidden] { display: none !important; }
+
+/* 部件鍵盤是頁面級的固定側欄，主內容用右側 padding 讓出它的寬度 */
+:root { --sidebar-w: min(54vw, 56rem); }
+body.panel-collapsed { --sidebar-w: 10rem; }
 
 body {
   margin: 0;
@@ -58,46 +69,63 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 1.5rem 1rem 3rem;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-header {
-  width: 100%;
-  max-width: 64rem;
-  margin-bottom: 1rem;
+.page {
+  padding: 1.5rem calc(var(--sidebar-w) + 1.5rem) 3rem 1.5rem;
 }
+
+header { margin-bottom: 1.5rem; }
 
 h1 {
-  font-size: 1.4rem;
+  font-size: 22px;
+  font-weight: 600;
   margin: 0 0 0.25rem;
 }
 
 .subtitle {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 13px;
   margin: 0;
 }
 
-.layout {
-  width: 100%;
-  max-width: 64rem;
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.panel {
-  flex: 1 1 32rem;
+.main {
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  padding: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+/* 分頁：部件查字 / 拆字。經典頁籤外觀——作用中的頁籤是帶邊框的盒子，
+   底邊蓋掉分隔線，看起來跟下方內容連成一體。 */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  appearance: none;
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  margin-bottom: -1px;
+  padding: 0.45rem 1rem 0.5rem;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tab:hover { color: var(--fg); background: var(--bg-subtle); }
+
+.tab.active {
+  color: var(--fg);
+  background: var(--bg);
+  border-color: var(--border);
 }
 
 .input-row {
@@ -108,102 +136,108 @@ h1 {
 
 #input {
   flex: 1 1 12rem;
-  font-size: 1.3rem;
+  font-size: 1.25rem;
   font-family: 'WFG FSung', serif;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
   background: var(--bg);
   color: var(--fg);
 }
 
+#input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+}
+
 button {
-  font-size: 0.95rem;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
   background: var(--bg);
   color: var(--fg);
   cursor: pointer;
 }
 
-button:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-#search { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover { filter: brightness(1.08); }
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.btn-ghost:hover { color: var(--fg); background: var(--bg-subtle); }
 
 .options {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
-  font-size: 0.9rem;
+  font-size: 13px;
   color: var(--muted);
 }
 
 .options label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+.options input[type='checkbox'] { accent-color: var(--accent); }
 
-#status, #counter {
-  font-size: 0.85rem;
+.result-meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 13px;
   color: var(--muted);
+  min-height: 1.25rem;
 }
 
 #output {
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
-  gap: 0.35rem;
+  gap: 0.3rem;
   min-height: 3rem;
 }
 
 .truncated-note {
   flex-basis: 100%;
-  font-size: 0.8rem;
+  font-size: 13px;
   color: var(--muted);
   padding-top: 0.25rem;
 }
 
-/* 字源圖例：點擊插入「只搜此區」篩選符號 */
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.legend-chip {
-  font-size: 0.75rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 999px;
-  background: hsl(var(--blk-h) var(--blk-bg-s) var(--blk-bg-l));
-  border: 1px solid hsl(var(--blk-h) var(--blk-border-s) var(--blk-border-l));
-  color: hsl(var(--blk-h) var(--blk-border-s) calc(var(--blk-border-l) - 15%));
-}
-
-@media (prefers-color-scheme: dark) {
-  .legend-chip { color: hsl(var(--blk-h) var(--blk-border-s) calc(var(--blk-border-l) + 15%)); }
-}
-
-.legend-chip:hover { border-color: var(--accent); color: var(--accent); }
-
-.legend-note {
-  margin: -0.3rem 0 0;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-
+/* 結果字塊：低飽和的字源淺色底 + 同色系虛線框；「基本」區維持中性。
+   命中類型只動文字：精確=綠、正體=橙、僅正體命中=淡化。 */
 .char-chip {
   font-family: 'WFG FSung', serif;
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   line-height: 1;
-  padding: 0.35rem 0.5rem;
-  border-radius: 0.5rem;
-  border: 1px solid hsl(var(--blk-h) var(--blk-border-s) var(--blk-border-l));
-  background: hsl(var(--blk-h) var(--blk-bg-s) var(--blk-bg-l));
+  padding: 0.35rem 0.45rem;
+  border-radius: 6px;
+  border: 1px dashed hsl(var(--blk-h, 0) var(--blk-s) var(--blk-border-l));
+  background: hsl(var(--blk-h, 0) var(--blk-s) var(--blk-bg-l));
   color: var(--fg);
   cursor: pointer;
 }
 
+.char-chip.blk-bmp {
+  border-color: var(--border);
+  background: var(--bg-subtle);
+}
+
+.char-chip:hover { border-color: var(--accent); }
+
 .char-chip.hit-exact { font-weight: 600; color: var(--exact); }
 .char-chip.hit-fuzzy { color: var(--fg); }
-.char-chip.hit-regu0 { color: var(--muted); border-style: dashed; }
+.char-chip.hit-regu0 { color: var(--muted); opacity: 0.75; }
 .char-chip.hit-regu1 { font-weight: 600; color: var(--regu); }
 
 .tree-row {
@@ -211,6 +245,7 @@ button:hover { border-color: var(--accent); color: var(--accent); }
   align-items: baseline;
   gap: 0.6rem;
   padding: 0.15rem 0;
+  flex-basis: 100%;
 }
 
 .tree-text {
@@ -218,88 +253,149 @@ button:hover { border-color: var(--accent); color: var(--accent); }
   font-size: 1.1rem;
 }
 
-/* 側邊部件鍵盤面板：所有分類一次列出，不用切換分頁。
-   佔滿視窗高度並固定在畫面上(sticky)，內部才是真正可滾動的區域——
-   之前用 CSS multi-column(column-width) 排版，溢出的內容會往「右邊多長
-   一欄」而不是往下，但外層只開了 overflow-y，導致多出來的欄位被裁掉、
-   永遠滾不到。改用 CSS Grid 讓內容單純往下折行，搭配 flex:1+min-height:0
-   這組標準寫法才能讓 overflow-y:auto 真正生效。 */
+/* 字源圖例：純顏色說明，不可點擊，直接展開顯示 */
+.legend-wrap {
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.legend-title { font-weight: 500; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 12px;
+}
+
+.legend-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 2px;
+  background: hsl(var(--blk-h, 0) var(--blk-s) var(--blk-dot-l));
+}
+
+.legend-chip.blk-bmp .legend-dot { background: var(--bg-subtle); border: 1px solid var(--border-strong); }
+
+.legend-note {
+  margin: 0.25rem 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 部件鍵盤：頁面級的固定側欄，貼住視口右緣、佔滿整個視窗高度、內部捲動。
+   側欄內部**不分欄**——所有分類單欄從上到下一次列出，每個分類是一條
+   flex-wrap 的「文字流」：行內小標籤 + 該分類全部按鍵攤平連排，按鍵縮小，
+   讓一屏能看到的部件數量最大化。
+   （flex 容器裡要讓 overflow-y:auto 生效，中間每層都要 min-height:0，
+   這是 flexbox 常見的坑，光加 overflow-y 不夠。） */
 .side-panel {
-  flex: 0 0 28rem;
-  position: sticky;
-  top: 1.5rem;
-  align-self: flex-start;
-  height: calc(100vh - 3rem);
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  padding: 0.75rem;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--sidebar-w);
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+  padding: 0.75rem 1rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
+
+.side-panel.collapsed {
+  bottom: auto;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.side-panel.collapsed:hover { background: var(--bg-subtle); }
 
 .side-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.9rem;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--muted);
   flex: 0 0 auto;
 }
 
 .side-panel-header button {
-  padding: 0.15rem 0.5rem;
-  font-size: 0.8rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 12px;
 }
 
 .keypad {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .side-panel.collapsed .keypad { display: none; }
-.side-panel.collapsed { height: auto; }
-
-.keypad-grid {
-  height: 100%;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-  gap: 0 1rem;
-  align-content: start;
-}
 
 .keypad-cat {
-  margin-bottom: 0.75rem;
-}
-
-.keypad-cat-title {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  margin: 0 0 0.3rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
-}
-
-.keypad-cat-icon { font-size: 1rem; }
-
-.keypad-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.2rem;
-  margin-bottom: 0.2rem;
+  align-items: center;
+  gap: 2px;
+  padding: 0.2rem 0;
+}
+
+.keypad-cat + .keypad-cat { border-top: 1px solid var(--border); }
+
+.keypad-cat-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.15rem 0.45rem;
+  margin-right: 0.35rem;
+  white-space: nowrap;
 }
 
 .keypad-key {
   font-family: 'WFG FSung', serif;
-  font-size: 1.2rem;
-  line-height: 1;
-  padding: 0.25rem 0.4rem;
-  border-radius: 0.5rem;
+  font-size: 1.1rem;
+  line-height: 1.25;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--fg);
 }
+
+.keypad-key:hover {
+  background: var(--bg-subtle);
+  border-color: var(--border-strong);
+}
+
+/* 自製即時 tooltip：原生 title 有內建延遲且無法調整，改用 JS 定位的浮層 */
+#tooltip {
+  position: fixed;
+  z-index: 10;
+  background: var(--fg);
+  color: var(--bg);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+}
+
+#tooltip.show { opacity: 1; }
 
 #toast {
   position: fixed;
@@ -309,34 +405,35 @@ button:hover { border-color: var(--accent); color: var(--accent); }
   background: var(--fg);
   color: var(--bg);
   padding: 0.5rem 1rem;
-  border-radius: 0.4rem;
+  border-radius: 6px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease, transform 0.15s ease;
-  font-size: 0.9rem;
+  font-size: 13px;
 }
 
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 footer {
-  width: 100%;
-  max-width: 64rem;
-  margin-top: 1.5rem;
-  font-size: 0.8rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
   color: var(--muted);
 }
 
-footer a { color: var(--accent); }
+footer a { color: var(--accent); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
 
-/* 窄螢幕：側邊鍵盤面板改到主面板下方，且收起時只留標題列 */
-@media (max-width: 56rem) {
-  .layout { flex-direction: column; }
+/* 窄螢幕：鍵盤側欄改回文件流，放到主面板下方 */
+@media (max-width: 60rem) {
+  :root, body.panel-collapsed { --sidebar-w: 0rem; }
+  .layout { display: flex; flex-direction: column; gap: 1rem; }
   .side-panel {
-    flex: 1 1 auto;
-    width: 100%;
     position: static;
-    height: 24rem;
+    width: 100%;
+    max-height: 24rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
   }
-  .side-panel.collapsed { height: auto; }
-  .keypad-grid { grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); }
 }

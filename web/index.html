@@ -7,38 +7,49 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="page">
 <header>
   <h1>部件檢索</h1>
-  <p class="subtitle">用漢字部件組合查找生僻字 — 新實作，資料與演算法沿用原作者 WFG 的「拆分樹比對法」</p>
+  <p class="subtitle">用漢字部件組合查找生僻字，資料與演算法沿用原作者 WFG 的「拆分樹比對法」</p>
 </header>
 
 <div class="layout">
-  <main class="panel">
-    <div class="input-row">
-      <input id="input" type="text" placeholder="輸入部件，例如「日月」；輸入「\明」可查該字的拆分樹" autocomplete="off">
-      <button id="search" type="button">查詢</button>
-      <button id="clear" type="button">清除</button>
-    </div>
+  <main class="main">
+    <nav class="tabs" role="tablist">
+      <button class="tab active" id="tab-search" type="button" role="tab" aria-selected="true">部件查字</button>
+      <button class="tab" id="tab-tree" type="button" role="tab" aria-selected="false">拆字</button>
+    </nav>
 
-    <div class="legend" id="legend" title="點擊可插入「只搜此區」的篩選符號"></div>
-    <p class="legend-note">預設不含「相容」區的字；點圖例的「相容」可單獨查詢該區。</p>
+    <div class="input-row">
+      <input id="input" type="text" placeholder="輸入部件，例如「日月」" autocomplete="off">
+      <button id="search" type="button" class="btn-primary">查詢</button>
+      <button id="clear" type="button" class="btn-ghost">清除</button>
+    </div>
 
     <div class="options">
-      <label><input id="opt-live" type="checkbox" checked> 即時查詢(自動完成)</label>
-      <label><input id="opt-variant" type="checkbox"> 包容異體</label>
-      <label><input id="opt-subdivide" type="checkbox"> 同字異拆(顯示全部拆法)</label>
-      <label><input id="opt-ucodeonly" type="checkbox"> 排除未編碼補充字</label>
+      <label><input id="opt-live" type="checkbox" checked> 即時查詢</label>
+      <label data-mode="search"><input id="opt-variant" type="checkbox"> 包容異體</label>
+      <label><input id="opt-subdivide" type="checkbox"> 同字異拆</label>
+      <label data-mode="search"><input id="opt-ucodeonly" type="checkbox"> 排除未編碼補充字</label>
     </div>
 
-    <div id="status"></div>
-    <div id="counter"></div>
+    <div class="result-meta">
+      <span id="status"></span>
+      <span id="counter"></span>
+    </div>
     <div id="output"></div>
+
+    <div class="legend-wrap">
+      <span class="legend-title">字源顏色圖例</span>
+      <div class="legend" id="legend"></div>
+      <p class="legend-note">查詢結果的底色代表該字的字源（Unicode 區塊）；「相容」區的重複碼位預設不列出。</p>
+    </div>
   </main>
 
   <aside class="side-panel" id="side-panel">
     <div class="side-panel-header">
       <span>部件鍵盤</span>
-      <button id="toggle-panel" type="button" title="收起/展開">▲</button>
+      <button id="toggle-panel" type="button" class="btn-ghost" title="收起/展開">收起</button>
     </div>
     <div class="keypad" id="keypad">
       <div class="keypad-grid" id="keypad-grid"></div>
@@ -49,9 +60,12 @@
 <footer>
   資料來源：<a href="https://fgwang.blogspot.com/2015/12/blog-post_30.html" target="_blank" rel="noopener">部件檢索</a>
   （原作者 WFG）。字型：<a href="https://fgwang.blogspot.com/2025/09/unicode-17.html" target="_blank" rel="noopener">全宋體</a>，僅限非商業用途。
-  詳見 <code>doc/</code> 與 <code>web/README.md</code>。
+  詳見 <a href="https://github.com/frankslin/char-components/tree/main/doc" target="_blank" rel="noopener">doc/</a>
+  與 <a href="https://github.com/frankslin/char-components/blob/main/web/README.md" target="_blank" rel="noopener">web/README.md</a>。
 </footer>
+</div>
 
+<div id="tooltip"></div>
 <div id="toast"></div>
 <script type="module" src="app.js"></script>
 </body>
