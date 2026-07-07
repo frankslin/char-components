@@ -56,3 +56,9 @@
 - 改動 `dt`/`rt`/`vt` 資料前，先確認是資料錯誤還是演算法錯誤——多數「查不到某字」的回報，根源在 `vt` 映射方向錯誤(見上面約束 3)，不要急著去改 `Eliminate()`。
 - 這個 repo 沒有 CI、沒有測試框架。新增任何自動化測試時，優先用 Node 內建的 `node:test` + `assert`，不要為了跑測試而引入額外相依套件，這與「單檔案零依賴」的專案精神一致。
 - 提交訊息、程式碼註解一律使用繁體中文或英文皆可，但不要新增簡體中文內容(維持與現有原文/文件一致的用字)。
+
+## `webfonts/wfg-fsung/`：全宋體的 webfont 切片版
+
+- 這是 `deps/fonts/FSung-*.ttf` 的 256 碼位 WOFF2 切片版本，做法比照鄰近的 `jigmo-webfonts`/`free-fonts` 專案慣例。建置腳本：`webfonts/build-wfg-fsung.py`。細節與已知的資料特性(`FSung-p` 排除、U+0000–00FF 分片的超集處理)見 `doc/04` 第 5.5 節與 package 自己的 `README.md`。
+- **這個 package 不可發布到 npm，也不可加進 `../free-fonts` 的 README/index.html 展示頁**，除非非商業授權限制已經跟那個專案的散布模式明確協調過。`package.json` 已設 `"private": true` 並用自訂的 `LicenseRef-WFG-NonCommercial` 標示，改動時不要移除這兩個保護措施。
+- 若 `deps/fonts/` 的字型檔案更新(隨 Unicode 新版本)，需要重跑 `build-wfg-fsung.py` 重新產生切片，不可只更新其中幾個分片檔案，避免新舊版本混雜。
