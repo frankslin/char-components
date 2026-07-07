@@ -47,7 +47,7 @@ const MODE = {
 };
 let mode = 'search';
 
-function setMode(next) {
+function setMode(next, { silent = false } = {}) {
   if (mode === next) return;
   MODE[mode].value = els.input.value;
   mode = next;
@@ -62,8 +62,58 @@ function setMode(next) {
   els.input.value = MODE[mode].value;
   els.counter.textContent = '';
   els.output.replaceChildren();
+  if (silent) return; // 由 URL 還原時(popstate/初次載入)，由呼叫端負責後續
   els.input.focus();
+  syncUrl(false);
   if (els.input.value) scheduleLiveSearch();
+}
+
+// 查詢狀態 ↔ URL query string，讓連結可以直接分享。
+// 選項只在偏離預設值時才寫進網址，保持乾淨。
+function stateToParams() {
+  const p = new URLSearchParams();
+  if (els.input.value) p.set('q', els.input.value);
+  if (mode === 'tree') p.set('mode', 'tree');
+  if (!els.variant.checked) p.set('v', '0');
+  if (els.subdivide.checked) p.set('d', '1');
+  if (els.ucodeOnly.checked) p.set('u', '1');
+  return p;
+}
+
+// 歷史棧策略：把「按查詢/Enter 確認過的查詢」與「由連結開啟/前後退還原的狀態」
+// 視為已定案(settled)的歷史紀錄。之後第一次變更(打字、勾選項、切分頁)會先
+// pushState 保護這筆定案紀錄，接下來的連續變更(即時查詢的逐鍵更新等)只
+// replaceState 原地改寫——這樣打一個詞不會塞進十筆歷史，但「後退」永遠回到
+// 上一個定案的查詢，不會被打字過程覆蓋掉。
+let urlSettled = true;
+
+function syncUrl(settle = false) {
+  const qs = stateToParams().toString();
+  const target = qs ? `?${qs}` : '';
+  if (location.search !== target) {
+    history[urlSettled ? 'pushState' : 'replaceState'](null, '', target || location.pathname);
+  }
+  urlSettled = settle;
+}
+
+function applyStateFromUrl() {
+  const p = new URLSearchParams(location.search);
+  els.variant.checked = p.get('v') !== '0';
+  els.subdivide.checked = p.get('d') === '1';
+  els.ucodeOnly.checked = p.get('u') === '1';
+  const m = p.get('mode') === 'tree' ? 'tree' : 'search';
+  setMode(m, { silent: true });
+  const q = p.get('q') ?? '';
+  els.input.value = q;
+  MODE[m].value = q;
+  clearTimeout(liveTimer);
+  urlSettled = true;
+  if (q) {
+    doSearch(FULL_MAX_RESULTS, { sync: false });
+  } else {
+    els.counter.textContent = '';
+    els.output.replaceChildren();
+  }
 }
 
 // 「補充」分類(見 blocks.js／doc/04 第 5 節)是作者暫用的私有造字區碼位，
@@ -71,6 +121,12 @@ function setMode(next) {
 function chipTitle(code, info) {
   if (info.cls === 'sup') return `${info.label}（尚未正式編碼，暫用私有碼位）`;
   return `U+${code.toString(16).toUpperCase()} · ${info.label}`;
+}
+
+// PUA(私有造字區)碼位必須用全宋體渲染(見 style.css 的 .pua-char)：
+// 系統字型在 15/16 輔助平面不會有字形，但個別 BMP PUA 碼位可能撞車。
+function isPua(code) {
+  return (code >= 0xE000 && code <= 0xF8FF) || code >= 0xF0000;
 }
 
 function hitClass(hit) {
@@ -99,9 +155,10 @@ function renderHits(hits, truncated) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = `char-chip ${hitClass(h.hit)} blk-${info.cls}`;
+    if (isPua(h.code)) btn.classList.add('pua-char');
     btn.textContent = h.char;
     btn.dataset.tip = chipTitle(h.code, info);
-    btn.addEventListener('click', () => copyChar(h.char));
+    btn.addEventListener('click', () => copyChar(h.char, btn.dataset.tip));
     frag.appendChild(btn);
   }
   els.output.appendChild(frag);
@@ -123,9 +180,10 @@ function renderTree(nodes) {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = `char-chip hit-exact blk-${info.cls}`;
+    if (isPua(n.code)) chip.classList.add('pua-char');
     chip.textContent = n.char;
     chip.dataset.tip = chipTitle(n.code, info);
-    chip.addEventListener('click', () => copyChar(n.char));
+    chip.addEventListener('click', () => copyChar(n.char, chip.dataset.tip));
     const text = document.createElement('span');
     text.className = 'tree-text';
     text.textContent = n.text;
@@ -156,9 +214,9 @@ function setupTooltip() {
 }
 
 let toastTimer;
-function copyChar(ch) {
+function copyChar(ch, tip) {
   navigator.clipboard?.writeText(ch).catch(() => {});
-  els.toast.textContent = `已複製「${ch}」`;
+  els.toast.textContent = tip ? `已複製「${ch}」 · ${tip}` : `已複製「${ch}」`;
   els.toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1200);
@@ -172,6 +230,7 @@ function buildLegend() {
     if (b.cls === 'cmp') continue;
     const item = document.createElement('span');
     item.className = `legend-chip blk-${b.cls}`;
+    item.dataset.tip = b.desc;
     const dot = document.createElement('span');
     dot.className = 'legend-dot';
     item.append(dot, document.createTextNode(b.label));
@@ -198,6 +257,7 @@ function buildKeypad(categories) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'keypad-key';
+      if (isPua(ch.codePointAt(0))) btn.classList.add('pua-char');
       btn.textContent = ch;
       btn.addEventListener('click', () => {
         insertAtCursor(els.input, ch);
@@ -213,14 +273,34 @@ function buildKeypad(categories) {
 let matcher;
 let composing = false;
 let liveTimer;
+let searchToken = 0;
 
-function doSearch(max) {
+function showBusy(el, text) {
+  const spin = document.createElement('span');
+  spin.className = 'spinner';
+  el.replaceChildren(spin, document.createTextNode(text));
+}
+
+function doSearch(max, { settle = false, sync = true } = {}) {
   const raw = els.input.value;
+  if (sync) syncUrl(settle);
+  const token = ++searchToken;
   if (!raw) {
     els.counter.textContent = '';
     els.output.replaceChildren();
     return;
   }
+  // 比對是同步計算、會佔住主執行緒，直接跑的話 spinner 根本畫不出來。
+  // 先顯示「檢索中」，等瀏覽器畫完這一幀(rAF + setTimeout)再開始算；
+  // token 用來作廢已排程但過期的檢索(使用者又打了字/清除/回退)。
+  showBusy(els.counter, '檢索中…');
+  requestAnimationFrame(() => setTimeout(() => {
+    if (token !== searchToken) return;
+    runMatch(raw, max);
+  }, 0));
+}
+
+function runMatch(raw, max) {
   const d = els.subdivide.checked;
   if (mode === 'tree') {
     const nodes = matcher.getTree(raw, d);
@@ -241,7 +321,8 @@ function doSearch(max) {
 }
 
 function runSearch() {
-  doSearch(FULL_MAX_RESULTS);
+  clearTimeout(liveTimer); // 取消排程中的即時查詢，避免完整結果出來後又被蓋掉
+  doSearch(FULL_MAX_RESULTS, { settle: true });
 }
 
 function scheduleLiveSearch() {
@@ -251,19 +332,21 @@ function scheduleLiveSearch() {
 }
 
 function clearInput() {
+  searchToken++; // 作廢排程中的檢索，避免清除後結果又冒出來
   els.input.value = '';
   els.counter.textContent = '';
   els.output.replaceChildren();
   els.input.focus();
+  syncUrl(false);
 }
 
 async function main() {
   buildLegend();
   setupTooltip();
-  els.status.textContent = '資料載入中…';
+  showBusy(els.status, '資料載入中（約 4MB，第一次開啟需要一點時間）…');
   const t0 = performance.now();
   try {
-    const { dt, rt, vt, kt } = await loadData('../data/');
+    const { dt, rt, vt, kt } = await loadData('./data/');
     matcher = createMatcher(dt, rt, vt);
     buildKeypad(parseKeypad(kt));
   } catch (err) {
@@ -276,6 +359,14 @@ async function main() {
   els.tabSearch.addEventListener('click', () => setMode('search'));
   els.tabTree.addEventListener('click', () => setMode('tree'));
   els.search.addEventListener('click', runSearch);
+  // 選項變更立即反映到網址(replace)並重跑即時查詢
+  for (const el of [els.variant, els.subdivide, els.ucodeOnly]) {
+    el.addEventListener('change', () => {
+      syncUrl(false);
+      scheduleLiveSearch();
+    });
+  }
+  window.addEventListener('popstate', applyStateFromUrl);
   els.input.addEventListener('input', () => {
     // 沿用 legacy 版的「\字」語法：在部件查字模式打「\」自動切到拆字分頁。
     if (mode === 'search' && els.input.value.startsWith('\\')) {
@@ -313,6 +404,10 @@ async function main() {
   els.sidePanel.addEventListener('click', () => {
     if (els.sidePanel.classList.contains('collapsed')) setCollapsed(false);
   });
+  // 手機(窄螢幕)上鍵盤是底部抽屜，預設收起，要用時再點開
+  if (window.matchMedia('(max-width: 60rem)').matches) setCollapsed(true);
+  // 開啟分享連結時，還原 ?q=…&mode=…&v/d/u 狀態並直接執行查詢
+  applyStateFromUrl();
   els.input.focus();
 }
 

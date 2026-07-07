@@ -5,8 +5,8 @@
 ## 專案現狀
 
 - **`legacy/部件檢索.htm`**：原作者 WFG 的單一 HTML 檔存檔版本，內含全部漢字拆分資料(`dt`/`rt`/`vt` 三個巨型陣列)與比對演算法(`Eliminate`/`GetMatch`/`Arrayalize`/`Exhaust`/`GetTree`)。**已封存，不再修改**，只做為行為對照的黃金參考版本保留（仍可離線雙擊開啟）。
-- **`web/`**：新實作，取代 `legacy/部件檢索.htm` 做為往後開發的主線。純 ES module + `fetch()`，無 bundler，讀取 `data/` 底下抽離出來的資料，演算法(`web/core.js`)是逐句對照 `legacy/部件檢索.htm` 翻譯而成。細節、已驗證行為、目前刻意先不做的功能見 `web/README.md`。
-- **`data/`**：從 `legacy/部件檢索.htm` 抽離出來的 `dt`/`rt`/`vt` 三張表(`dt.jsonl`/`rt.jsonl`/`vt.json`)，`data/extract.py` 可從 `legacy/部件檢索.htm` 重新產生，`data/README.md` 有完整 schema 說明。
+- **`web/`**：新實作，取代 `legacy/部件檢索.htm` 做為往後開發的主線。純 ES module + `fetch()`，無 bundler，讀取 `web/data/` 底下抽離出來的資料，演算法(`web/core.js`)是逐句對照 `legacy/部件檢索.htm` 翻譯而成。細節、已驗證行為、目前刻意先不做的功能見 `web/README.md`。
+- **`web/data/`**：從 `legacy/部件檢索.htm` 抽離出來的 `dt`/`rt`/`vt` 三張表(`dt.jsonl`/`rt.jsonl`/`vt.json`)，`web/data/extract.py` 可從 `legacy/部件檢索.htm` 重新產生，`web/data/README.md` 有完整 schema 說明(含 legacy 之外的人工增補清單——重跑 extract.py 後需手動補回)。放在 `web/` 底下是刻意的，讓 `web/` 目錄可以獨立部署。
 - 背景與演算法原理見 `doc/01`~`doc/04`。**動手改演算法前必讀 `doc/04-開發理解與重構指引.md`**，尤其是「拆分樹比對法」與「異體映射」章節——這兩塊最容易改錯。
 - `LICENSE` 是原作者的公開授權條款，禁止商業使用；任何衍生產出物需保留來源標示。
 
@@ -38,12 +38,12 @@
 
 ### Phase 1 — 資料抽離 ✅ 已完成
 
-- `dt`/`rt`/`vt`/`kt` 已抽成 `data/dt.jsonl`、`data/rt.jsonl`、`data/vt.json`、`data/kt.json`，`data/extract.py` 可重新從 `legacy/部件檢索.htm` 產生，並已用逐項比對驗證完全等價。
+- `dt`/`rt`/`vt`/`kt` 已抽成 `web/data/dt.jsonl`、`web/data/rt.jsonl`、`web/data/vt.json`、`web/data/kt.json`(原在 repo 根目錄的 `data/`，後為讓 `web/` 可獨立部署而移入)，`web/data/extract.py` 可重新從 `legacy/部件檢索.htm` 產生，抽離當時已用逐項比對驗證完全等價；其後的人工增補見 `web/data/README.md`。
 - `GetBlock`/`GetIndex` 手刻的 Unicode 區塊偏移量**尚未**生成式化，仍是原樣搬進 `web/core.js`(見 Phase 4 待辦)。
 
 ### Phase 2 — 新前端實作(no-build) ✅ 已完成部件鍵盤／即時查詢／字源圖例，見 `web/README.md` 的待補清單
 
-- 沒有走原計畫的「建置腳本組裝回單一 htm」路線——改成 `web/` 這個免建置的多檔案靜態實作，直接用 `<script type="module">` + `fetch()` 讀取 `data/`。決策原因：使用者只需要「部署後點開能用」，不需要保留單一 htm 產出。
+- 沒有走原計畫的「建置腳本組裝回單一 htm」路線——改成 `web/` 這個免建置的多檔案靜態實作，直接用 `<script type="module">` + `fetch()` 讀取 `web/data/`。決策原因：使用者只需要「部署後點開能用」，不需要保留單一 htm 產出。
 - `web/core.js` 的演算法已用 Node 腳本（比對「日月/明/日日月/日明」等黃金案例）與 Playwright 驅動真實瀏覽器（載入頁面、輸入查詢、點字複製、`\字` 解構、包容異體勾選、側邊鍵盤插入、字源圖例篩選）雙重驗證過，行為與 `legacy/部件檢索.htm` 一致。
 - 側邊部件鍵盤(`web/keypad.js`)、即時查詢(自動完成，debounce + IME 感知)、字源圖例(`web/blocks.js`，14 分類、可點擊插入篩選符號、結果依字源上色、補充字 PUA 提示與正式編碼字分開顯示)都已實作完成。
 - 尚未搬過來的功能列在 `web/README.md`(異體檢索 UI、選項記憶、外部字典跳轉、資料按需分片)——之後要加功能前先看那份清單，避免重複造輪子或誤以為是遺漏而重新分析。
@@ -57,13 +57,13 @@
 ### Phase 4 — 尚未排期
 
 - `GetBlock`/`GetIndex` 的 Unicode 區塊偏移量生成式化(見 Phase 1 備註)。
-- `data/` 三個檔案目前一次整包 `fetch()`(共約 4MB)，還沒做成 `webfonts/wfg-fsung` 那種按 Unicode 區塊分片、按需載入。
+- `web/data/` 三個檔案目前一次整包 `fetch()`(共約 4MB)，還沒做成 `webfonts/wfg-fsung` 那種按 Unicode 區塊分片、按需載入。
 
 ## 給 agent 的具體提醒
 
 - 改動 `dt`/`rt`/`vt` 資料前，先確認是資料錯誤還是演算法錯誤——多數「查不到某字」的回報，根源在 `vt` 映射方向錯誤(見上面約束 3)，不要急著去改 `eliminate()`。
 - 這個 repo 沒有 CI、沒有正式測試框架。**待補技術債**：上面「黃金回歸測試案例」目前只用臨時腳本手動驗證過，應該補成 `web/core.test.mjs` 之類、用 Node 內建 `node:test` + `assert` 的可重跑測試，不要為了跑測試而引入額外相依套件，這與 `web/` 的 no-build/零依賴精神一致。
-- `web/` 需要透過 http(s) 開啟才能測試(`fetch()` 讀 `data/` 在 `file://` 下會被擋)，本機驗證可用 `python3 -m http.server` 之類的靜態伺服器，開發時在 repo 根目錄起服務、瀏覽 `/web/index.html` 即可(相對路徑 `../data/`、`../webfonts/` 才會正確解析)。
+- `web/` 需要透過 http(s) 開啟才能測試(`fetch()` 讀 `web/data/` 在 `file://` 下會被擋)，本機驗證可用 `python3 -m http.server` 之類的靜態伺服器，開發時在 repo 根目錄起服務、瀏覽 `/web/index.html` 即可(字型的相對路徑 `../webfonts/` 才會正確解析；資料已在 `web/data/` 內)。
 - 提交訊息、程式碼註解一律使用繁體中文或英文皆可，但不要新增簡體中文內容(維持與現有原文/文件一致的用字)。
 
 ## `webfonts/wfg-fsung/`：全宋體的 webfont 切片版

@@ -1,5 +1,19 @@
 @import url('../webfonts/wfg-fsung/wfg-fsung.css');
 
+/* 漢字優先複用系統內建宋體/明體(零下載)，系統字型缺字的碼位由瀏覽器
+   逐字回退到 WFG FSung 的 webfont 切片(按 256 碼位分片、用到才下載)——
+   罕用擴充區、新收錄的字自然落到 FSung。
+   注意不能用 @font-face + local() 做範圍控制：Chrome 86+ 基於反指紋
+   考量已不查詢本地字型(實測 headless/真實 Chrome、WebKit 都不匹配)。
+   補充字(PUA)絕大多數在 15/16 輔助平面(系統字型不可能有字形，回退安全)，
+   對已知是補充字的元素另用 .pua-char 強制 FSung 優先(見下)，避免
+   個別系統字型的 BMP PUA 碼位撞車顯示成不相干的字(AGENTS.md 約束 5)。 */
+:root {
+  --font-han: 'Songti TC', 'Songti SC', 'SimSun', 'PMingLiU', 'MingLiU',
+    'Noto Serif TC', 'Noto Serif CJK TC', 'WFG FSung', serif;
+  --font-pua: 'WFG FSung', serif;
+}
+
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
@@ -131,19 +145,42 @@ h1 {
 .input-row {
   display: flex;
   gap: 0.5rem;
-  flex-wrap: wrap;
+}
+
+.input-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
 }
 
 #input {
-  flex: 1 1 12rem;
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 1.25rem;
-  font-family: 'WFG FSung', serif;
-  padding: 0.45rem 0.75rem;
+  font-family: var(--font-han);
+  padding: 0.45rem 2.2rem 0.45rem 0.75rem;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   background: var(--bg);
   color: var(--fg);
 }
+
+/* 清除鈕放在輸入框內側，輸入框為空時不顯示 */
+.input-clear {
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: 0.3rem 0.55rem;
+  font-size: 14px;
+}
+
+.input-clear:hover { color: var(--fg); }
+.input-wrap:has(#input:placeholder-shown) .input-clear { display: none; }
 
 #input:focus {
   outline: 2px solid var(--accent);
@@ -190,6 +227,21 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .options label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
 .options input[type='checkbox'] { accent-color: var(--accent); }
 
+/* 載入/檢索中的轉圈提示 */
+.spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: -2px;
+  margin-right: 0.4rem;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .result-meta {
   display: flex;
   gap: 1rem;
@@ -217,7 +269,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* 結果字塊：低飽和的字源淺色底 + 同色系虛線框；「基本」區維持中性。
    命中類型只動文字：精確=綠、正體=橙、僅正體命中=淡化。 */
 .char-chip {
-  font-family: 'WFG FSung', serif;
+  font-family: var(--font-han);
   font-size: 1.5rem;
   line-height: 1;
   padding: 0.35rem 0.45rem;
@@ -235,6 +287,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .char-chip:hover { border-color: var(--accent); }
 
+/* 補充字(PUA 碼位)必須用全宋體渲染，不走系統字型 */
+.pua-char { font-family: var(--font-pua); }
+
 .char-chip.hit-exact { font-weight: 600; color: var(--exact); }
 .char-chip.hit-fuzzy { color: var(--fg); }
 .char-chip.hit-regu0 { color: var(--muted); opacity: 0.75; }
@@ -249,7 +304,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 
 .tree-text {
-  font-family: 'WFG FSung', serif;
+  font-family: var(--font-han);
   font-size: 1.1rem;
 }
 
@@ -366,7 +421,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 
 .keypad-key {
-  font-family: 'WFG FSung', serif;
+  font-family: var(--font-han);
   font-size: 1.1rem;
   line-height: 1.25;
   padding: 0.1rem 0.3rem;
@@ -425,15 +480,36 @@ footer {
 footer a { color: var(--accent); text-decoration: none; }
 footer a:hover { text-decoration: underline; }
 
-/* 窄螢幕：鍵盤側欄改回文件流，放到主面板下方 */
+/* 窄螢幕(手機)：鍵盤改成固定在螢幕底部的抽屜——收起時只剩一條標題列，
+   點開後從下方彈出半屏高的鍵盤，輸入框保持可見，點鍵即輸入即看結果，
+   不用在「捲下去找鍵、捲上來看結果」之間往返。按鍵同時加大到接近
+   44px 的觸控目標。 */
 @media (max-width: 60rem) {
   :root, body.panel-collapsed { --sidebar-w: 0rem; }
-  .layout { display: flex; flex-direction: column; gap: 1rem; }
+  .page { padding-bottom: 5rem; }
   .side-panel {
-    position: static;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
-    max-height: 24rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    max-height: 50vh;
+    border: none;
+    border-top: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 16px rgb(0 0 0 / 8%);
+    z-index: 5;
   }
+  .side-panel.collapsed { bottom: 0; border-bottom: none; }
+  .keypad-key {
+    font-size: 1.35rem;
+    padding: 0.45rem 0.55rem;
+  }
+  .keypad-cat { gap: 4px; padding: 0.3rem 0; }
+}
+
+/* 觸屏裝置沒有 hover，tooltip 只會在點按時閃一下，直接停用
+   （碼位資訊已併入複製時的 toast） */
+@media (hover: none) {
+  #tooltip { display: none !important; }
 }

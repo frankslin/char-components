@@ -20,7 +20,8 @@ import json
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+# 本檔案位於 web/data/，repo 根目錄是上上層
+ROOT = Path(__file__).resolve().parent.parent.parent
 HTM_PATH = ROOT / "legacy" / "部件檢索.htm"
 OUT_DIR = Path(__file__).resolve().parent
 
