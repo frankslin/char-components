@@ -1,7 +1,7 @@
 全宋體 (WFG FSung)
 Author: WFG (fgwang.blogspot.com)
 Source: https://fgwang.blogspot.com/2025/09/unicode-17.html
-Package generated: 2025/09/24 build of 全宋體, matching 部件檢索.htm core version 0.9.8.4
+Package generated: 2025/09/24 build of 全宋體
 
 SPDX-style identifier used in package.json: LicenseRef-WFG-NonCommercial
 (This is NOT an OSI-approved or SPDX-registered license identifier. It is
@@ -39,17 +39,12 @@ PLAIN-LANGUAGE SUMMARY (not a substitute for the original terms above)
 WHAT THIS PACKAGE IS
 ------------------------------------------------------------------------
 
-This directory repackages 全宋體 (distributed by the author as seven
-whole TTF files, deps/fonts/FSung-*.ttf in the parent repository) into
-256-codepoint WOFF2 slices with a generated CSS file, for use as a
-self-hosted webfont on the 部件檢索 project. No glyphs were modified;
-only the file format, chunking, and packaging were changed. The build
-script (../build-wfg-fsung.py) documents exactly how the slices were
-produced and can regenerate them from the original TTF files.
+This package repackages 全宋體 (distributed by its author as seven whole
+TTF files) into 256-codepoint WOFF2 slices with a generated CSS file, for
+use as a self-hosted webfont. No glyphs were modified; only the file
+format, chunking, and packaging were changed.
 
-Because this differs in character from the other permissively-licensed
-fonts distributed under the sibling `free-fonts` project's packages,
-this package is kept unpublished (not pushed to npm, not listed in
-`free-fonts`' README/index.html) unless and until the non-commercial
-scope has been explicitly reconciled with that project's distribution
-model.
+This package's non-commercial terms are stricter than many other
+permissively-licensed (OFL/MIT/CC0) CJK webfont packages -- read
+LICENSE and README.md before assuming this font can be used the same
+way as those.

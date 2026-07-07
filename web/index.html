@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>部件檢索</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>部件檢索</h1>
+  <p class="subtitle">用漢字部件組合查找生僻字 — 新實作，資料與演算法沿用原作者 WFG 的「拆分樹比對法」</p>
+</header>
+
+<div class="panel">
+  <div class="input-row">
+    <input id="input" type="text" placeholder="輸入部件，例如「日月」；輸入「\明」可查該字的拆分樹" autocomplete="off">
+    <button id="search" type="button">查詢</button>
+    <button id="clear" type="button">清除</button>
+  </div>
+  <div class="options">
+    <label><input id="opt-variant" type="checkbox"> 包容異體</label>
+    <label><input id="opt-subdivide" type="checkbox"> 同字異拆(顯示全部拆法)</label>
+    <label><input id="opt-ucodeonly" type="checkbox"> 排除未編碼補充字</label>
+  </div>
+  <div id="status"></div>
+  <div id="counter"></div>
+  <div id="output"></div>
+</div>
+
+<footer>
+  資料來源：<a href="https://fgwang.blogspot.com/2015/12/blog-post_30.html" target="_blank" rel="noopener">部件檢索</a>
+  （原作者 WFG）。字型：<a href="https://fgwang.blogspot.com/2025/09/unicode-17.html" target="_blank" rel="noopener">全宋體</a>，僅限非商業用途。
+  詳見 <code>doc/</code> 與 <code>web/README.md</code>。
+</footer>
+
+<div id="toast"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
