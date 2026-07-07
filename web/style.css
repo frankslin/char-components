@@ -1,8 +1,10 @@
-/* 用 unpkg 而非 jsDelivr：wfg-fsung-webfonts 整個 npm 包(含全部字型切片)
-   超過 jsDelivr 150MB 的限制，會被直接拒絕(對所有檔案回 403，不只是
-   超大的那個檔案)；unpkg 沒有這個包大小限制。web/ 因此不再依賴本機的
-   ../webfonts/ 相對路徑，可以真正獨立部署。 */
-@import url('https://unpkg.com/wfg-fsung-webfonts@1.0.0/wfg-fsung.css');
+/* 字型是 web/webfonts/wfg-fsung/ 底下的 vendored 副本(跟 repo 根目錄的
+   webfonts/wfg-fsung/ 內容一致，那份是給 wfg-fsung-webfonts npm 套件用
+   的)，不透過 CDN 載入。曾經試過改指向 unpkg CDN(見 git 歷史)，但 unpkg
+   代理 npm registry 的延遲不穩定，體驗不如本機同源字型；vendored 副本
+   讓 web/ 不必依賴任何外部服務就能獨立部署。字型檔案更新時記得同步這份
+   副本，見 webfonts/build-wfg-fsung.py 的 sync_vendor_copy()。 */
+@import url('./webfonts/wfg-fsung/wfg-fsung.css');
 
 /* 漢字優先複用系統內建宋體/明體(零下載)，系統字型缺字的碼位由瀏覽器
    逐字回退到 WFG FSung 的 webfont 切片(按 256 碼位分片、用到才下載)——
@@ -114,36 +116,6 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-}
-
-/* 分頁：部件查字 / 拆字。經典頁籤外觀——作用中的頁籤是帶邊框的盒子，
-   底邊蓋掉分隔線，看起來跟下方內容連成一體。 */
-.tabs {
-  display: flex;
-  gap: 0.25rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.tab {
-  appearance: none;
-  background: none;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  margin-bottom: -1px;
-  padding: 0.45rem 1rem 0.5rem;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.tab:hover { color: var(--fg); background: var(--bg-subtle); }
-
-.tab.active {
-  color: var(--fg);
-  background: var(--bg);
-  border-color: var(--border);
 }
 
 .input-row {
@@ -299,18 +271,152 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .char-chip.hit-regu0 { color: var(--muted); opacity: 0.75; }
 .char-chip.hit-regu1 { font-weight: 600; color: var(--regu); }
 
-.tree-row {
+/* 拆分樹：真正的「自上而下」節點樹(org-chart 風格)。
+   結構：ul.tree-chart > li > (span.tree-node + ul > li …)。
+   連接線畫法(經典 CSS family-tree 技巧)：
+   - 父節點往下的落線：子 ul 的 ::before(佔 ul 的 padding-top 區)
+   - 每個子節點：::before/::after 各畫一半的水平軌 + ::after 的垂直落線
+   - 獨生子不畫水平軌(only-child 隱藏)，只剩父 ul 的直落線
+   - 第一個/最後一個子節點把外側的水平軌截掉並帶圓角 */
+.split-trees {
   display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-  padding: 0.15rem 0;
-  flex-basis: 100%;
+  align-items: flex-start;
+  gap: 1.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
 }
 
-.tree-text {
-  font-family: var(--font-han);
-  font-size: 1.1rem;
+.split-tree { flex: 0 0 auto; }
+
+.split-tree-leaf {
+  font-size: 13px;
+  color: var(--muted);
 }
+
+.tree-chart, .tree-chart ul {
+  display: flex;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree-chart ul {
+  padding-top: 14px;
+  position: relative;
+}
+
+.tree-chart li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 14px 5px 0;
+}
+
+.tree-chart > li { padding-top: 0; }
+
+.tree-chart li::before, .tree-chart li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 14px;
+  border-top: 1px solid var(--border-strong);
+}
+
+.tree-chart li::after {
+  right: auto;
+  left: 50%;
+  border-left: 1px solid var(--border-strong);
+}
+
+.tree-chart li:only-child::before, .tree-chart li:only-child::after { display: none; }
+.tree-chart > li::before, .tree-chart > li::after { display: none; }
+.tree-chart li:first-child::before, .tree-chart li:last-child::after { border-top: none; }
+
+.tree-chart li:last-child::before {
+  border-right: 1px solid var(--border-strong);
+  border-radius: 0 6px 0 0;
+}
+
+.tree-chart li:first-child::after { border-radius: 6px 0 0 0; }
+
+/* 父節點往下的落線(獨生子時是唯一的連接線) */
+.tree-chart ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 14px;
+  border-left: 1px solid var(--border-strong);
+}
+
+.tree-node {
+  font-family: var(--font-han);
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+}
+
+.tree-root {
+  font-size: 1.4rem;
+  border-color: var(--border-strong);
+}
+
+/* 內層「┇」一字多拆的分隔節點 */
+.tree-alt-chip {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  padding: 0.25rem 0.35rem;
+}
+
+/* 每個字塊包一層 wrap：本體按鈕(預設點擊=複製) + hover 才浮現的
+   小工具列(複製/拆字查詢/查字典)。工具列是 chip 的手足元素，不是子元素，
+   所以點工具列按鈕不會被本體按鈕的 click 攔截。 */
+.chip-wrap { position: relative; display: inline-flex; }
+
+.chip-actions {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 4px);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 14%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease;
+  z-index: 4;
+}
+
+.chip-wrap:hover .chip-actions,
+.chip-wrap:focus-within .chip-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.chip-action {
+  border: none;
+  background: none;
+  padding: 0.25rem 0.45rem;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 5px;
+  color: var(--muted);
+}
+
+.chip-action:hover { background: var(--bg-subtle); color: var(--fg); }
 
 /* 字源圖例：純顏色說明，不可點擊，直接展開顯示 */
 .legend-wrap {
@@ -394,13 +500,112 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   font-size: 12px;
 }
 
-.keypad {
+/* 側欄頂端「部件鍵盤／字詳情」小頁籤，切換 #side-panel 的 data-view。
+   點字詳情時樣式沿用主分頁 .tab 的邏輯但縮小尺寸，維持視覺語言一致。 */
+.side-panel-tabs { display: flex; gap: 0.2rem; }
+
+.side-tab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 5px;
+  padding: 0.15rem 0.55rem;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.side-tab:hover { color: var(--fg); background: var(--bg-subtle); }
+.side-tab.active { color: var(--fg); background: var(--bg-subtle); border-color: var(--border); }
+
+/* 鍵盤／字詳情共用同一個可捲動容器，用 data-view 切換顯示哪一個，
+   避免兩份各自的 overflow-y 邏輯要重複維護。 */
+.panel-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
 }
 
-.side-panel.collapsed .keypad { display: none; }
+.side-panel[data-view='keypad'] .char-detail { display: none; }
+.side-panel[data-view='detail'] .keypad { display: none; }
+.side-panel.collapsed .panel-body { display: none; }
+
+/* 字詳情：點一個查詢結果字塊後，右側面板顯示該字的碼位、拆分與快速動作。 */
+.char-detail { position: relative; }
+
+.char-detail-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 0.2rem 0.45rem;
+}
+
+.char-detail-close:hover { color: var(--fg); background: var(--bg-subtle); border-radius: 5px; }
+
+.char-detail-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.char-detail-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.char-detail-char {
+  font-family: var(--font-han);
+  font-size: 3.5rem;
+  line-height: 1;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+.char-detail-meta {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+
+.char-detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.15rem 0.45rem;
+  display: inline-block;
+  margin: 0.75rem 0 0.4rem;
+}
+
+/* 外部字典：詳情面板的主要動作，放在大字正下方、做成醒目的大按鈕 */
+.char-detail-links {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.char-detail-link {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 0.4rem 0.8rem;
+}
+
+.char-detail-link:hover { background: var(--accent); color: #fff; }
 
 .keypad-cat {
   display: flex;

@@ -1,0 +1,5 @@
+/webfonts/wfg-fsung/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/webfonts/wfg-fsung/*.css
+  Cache-Control: public, max-age=86400

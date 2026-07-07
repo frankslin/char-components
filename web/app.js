@@ -7,6 +7,23 @@ const LIVE_MAX_RESULTS = 500;
 const FULL_MAX_RESULTS = 3000;
 const LIVE_DEBOUNCE_MS = 120;
 
+// 外部字典：字詳情面板會把全部連結一次列出(PUA 補充字除外——沒有正式碼位，
+// 外部字典查不到)。字統網是 legacy 版預設的 `ref`；其餘 URL 格式都驗證過
+// 可直接以字(或碼位)查詢——國學大師的格式出自其官方說明頁(站點有地區
+// 連線限制，未能直接實測)。Unihan 是 Unicode 官方資料庫，再罕見的正式
+// 編碼字都有記錄，對擴充區生僻字特別有用。
+const EXTERNAL_DICTS = [
+  { name: '字統網', url: (ch) => `https://zi.tools/zi/${encodeURIComponent(ch)}` },
+  { name: '漢典', url: (ch) => `https://www.zdic.net/hans/${encodeURIComponent(ch)}` },
+  { name: '教育部異體字字典', url: (ch) => `https://dict.variants.moe.edu.tw/search.jsp?QTP=0&WORD=${encodeURIComponent(ch)}` },
+  { name: '國學大師', url: (ch) => `https://www.guoxuedashi.net/zidian/so.php?sokeyzi=${encodeURIComponent(ch)}&kz=1` },
+  { name: '萌典', url: (ch) => `https://www.moedict.tw/${encodeURIComponent(ch)}` },
+  { name: '維基詞典(中)', url: (ch) => `https://zh.wiktionary.org/wiki/${encodeURIComponent(ch)}` },
+  { name: 'Wiktionary(英)', url: (ch) => `https://en.wiktionary.org/wiki/${encodeURIComponent(ch)}` },
+  { name: 'ウィクショナリー(日)', url: (ch) => `https://ja.wiktionary.org/wiki/${encodeURIComponent(ch)}` },
+  { name: 'Unihan', url: (ch) => `https://www.unicode.org/cgi-bin/GetUnihanData.pl?codepoint=U%2B${ch.codePointAt(0).toString(16).toUpperCase()}` },
+];
+
 // 「相容表意文字」區都是外觀與基本區重複的相容碼位，一般使用者不該把它們
 // 打進文件裡，所以一律不列出。core.js 的旗標語法('@'/'A'..'J'/'X'/'Y'/'Z')
 // 仍然有效——真的要查相容區，直接在輸入前打「X」即可，但 UI 上不再提供入口。
@@ -22,8 +39,6 @@ const els = {
   input: document.getElementById('input'),
   search: document.getElementById('search'),
   clear: document.getElementById('clear'),
-  tabSearch: document.getElementById('tab-search'),
-  tabTree: document.getElementById('tab-tree'),
   live: document.getElementById('opt-live'),
   variant: document.getElementById('opt-variant'),
   subdivide: document.getElementById('opt-subdivide'),
@@ -37,35 +52,27 @@ const els = {
   keypadGrid: document.getElementById('keypad-grid'),
   sidePanel: document.getElementById('side-panel'),
   togglePanel: document.getElementById('toggle-panel'),
+  sideTabKeypad: document.getElementById('side-tab-keypad'),
+  sideTabDetail: document.getElementById('side-tab-detail'),
+  charDetail: document.getElementById('char-detail'),
 };
 
-// 兩種查詢模式各自記住輸入內容，切換分頁時互不干擾。
-// 拆字模式對應 legacy 版的「\字」語法；在部件查字模式輸入「\」會自動切過去。
-const MODE = {
-  search: { placeholder: '輸入部件，例如「日月」', value: '' },
-  tree: { placeholder: '輸入單一漢字，例如「明」，列出它的拆分樹', value: '' },
-};
-let mode = 'search';
+// 側欄「收起/展開」：跟 setSideView 一樣拉到模組層級，因為點字塊觸發的
+// showCharDetail() 也需要在使用者收起面板時自動展開，讓詳情看得到。
+function setCollapsed(collapsed) {
+  els.sidePanel.classList.toggle('collapsed', collapsed);
+  document.body.classList.toggle('panel-collapsed', collapsed);
+  els.togglePanel.textContent = collapsed ? '展開' : '收起';
+}
 
-function setMode(next, { silent = false } = {}) {
-  if (mode === next) return;
-  MODE[mode].value = els.input.value;
-  mode = next;
-  els.tabSearch.classList.toggle('active', mode === 'search');
-  els.tabTree.classList.toggle('active', mode === 'tree');
-  els.tabSearch.setAttribute('aria-selected', String(mode === 'search'));
-  els.tabTree.setAttribute('aria-selected', String(mode === 'tree'));
-  document.querySelectorAll('.options [data-mode]').forEach((el) => {
-    el.hidden = el.dataset.mode !== mode;
-  });
-  els.input.placeholder = MODE[mode].placeholder;
-  els.input.value = MODE[mode].value;
-  els.counter.textContent = '';
-  els.output.replaceChildren();
-  if (silent) return; // 由 URL 還原時(popstate/初次載入)，由呼叫端負責後續
-  els.input.focus();
-  syncUrl(false);
-  if (els.input.value) scheduleLiveSearch();
+// 側欄「部件鍵盤／字詳情」頁籤：點字塊會自動切到字詳情(見 showCharDetail)，
+// 使用者也能隨時切回鍵盤，詳情內容會保留到下次點其他字為止。
+function setSideView(view) {
+  els.sidePanel.dataset.view = view;
+  els.sideTabKeypad.classList.toggle('active', view === 'keypad');
+  els.sideTabDetail.classList.toggle('active', view === 'detail');
+  els.sideTabKeypad.setAttribute('aria-selected', String(view === 'keypad'));
+  els.sideTabDetail.setAttribute('aria-selected', String(view === 'detail'));
 }
 
 // 查詢狀態 ↔ URL query string，讓連結可以直接分享。
@@ -73,7 +80,6 @@ function setMode(next, { silent = false } = {}) {
 function stateToParams() {
   const p = new URLSearchParams();
   if (els.input.value) p.set('q', els.input.value);
-  if (mode === 'tree') p.set('mode', 'tree');
   if (!els.variant.checked) p.set('v', '0');
   if (els.subdivide.checked) p.set('d', '1');
   if (els.ucodeOnly.checked) p.set('u', '1');
@@ -101,15 +107,14 @@ function applyStateFromUrl() {
   els.variant.checked = p.get('v') !== '0';
   els.subdivide.checked = p.get('d') === '1';
   els.ucodeOnly.checked = p.get('u') === '1';
-  const m = p.get('mode') === 'tree' ? 'tree' : 'search';
-  setMode(m, { silent: true });
   const q = p.get('q') ?? '';
   els.input.value = q;
-  MODE[m].value = q;
   clearTimeout(liveTimer);
   urlSettled = true;
   if (q) {
     doSearch(FULL_MAX_RESULTS, { sync: false });
+    // 舊版分享連結的 ?mode=tree(拆字分頁)：拆字已統一併入字詳情面板
+    if (p.get('mode') === 'tree') openDetailForChar(q);
   } else {
     els.counter.textContent = '';
     els.output.replaceChildren();
@@ -147,19 +152,65 @@ function insertAtCursor(el, text) {
   el.setSelectionRange(pos, pos);
 }
 
+// 每個字塊是「本體按鈕 + hover 才浮現的小工具列」組成的 wrap：
+// 直接點字塊＝預設動作(複製)；hover 出現的工具列可以另外選「拆字查詢」
+// (切到拆字分頁查這個字)或「查字典」(開 zi.tools 新分頁)。三種動作都會
+// 同時把右側面板切到「字詳情」顯示這個字的碼位/拆分/快速動作——
+// 觸控裝置沒有 hover，摸不到工具列，但字詳情面板裡有同樣的三顆按鈕可用。
+function buildCharChip(char, code, info, chipClass) {
+  const wrap = document.createElement('span');
+  wrap.className = 'chip-wrap';
+
+  const tip = chipTitle(code, info);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = chipClass;
+  if (isPua(code)) btn.classList.add('pua-char');
+  btn.textContent = char;
+  btn.dataset.tip = tip;
+  btn.addEventListener('click', () => {
+    copyChar(char, tip);
+    showCharDetail(char, code, info);
+  });
+
+  const actions = document.createElement('div');
+  actions.className = 'chip-actions';
+  actions.appendChild(
+    buildChipAction('⧉', '複製', () => {
+      copyChar(char, tip);
+      showCharDetail(char, code, info);
+    }),
+  );
+  // PUA 補充字沒有正式碼位，外部字典查不到，不提供字典入口
+  if (!isPua(code)) {
+    actions.appendChild(buildChipAction('典', `查${EXTERNAL_DICTS[0].name}`, () => {
+      showCharDetail(char, code, info);
+      window.open(EXTERNAL_DICTS[0].url(char), '_blank', 'noopener');
+    }));
+  }
+  wrap.append(btn, actions);
+  return wrap;
+}
+
+function buildChipAction(label, tip, fn) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'chip-action';
+  b.textContent = label;
+  b.dataset.tip = tip;
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fn();
+  });
+  return b;
+}
+
 function renderHits(hits, truncated) {
   els.output.replaceChildren();
   const frag = document.createDocumentFragment();
   for (const h of hits) {
     const info = blockInfo(h.block);
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `char-chip ${hitClass(h.hit)} blk-${info.cls}`;
-    if (isPua(h.code)) btn.classList.add('pua-char');
-    btn.textContent = h.char;
-    btn.dataset.tip = chipTitle(h.code, info);
-    btn.addEventListener('click', () => copyChar(h.char, btn.dataset.tip));
-    frag.appendChild(btn);
+    frag.appendChild(buildCharChip(h.char, h.code, info, `char-chip ${hitClass(h.hit)} blk-${info.cls}`));
   }
   els.output.appendChild(frag);
   if (truncated) {
@@ -170,27 +221,177 @@ function renderHits(hits, truncated) {
   }
 }
 
-function renderTree(nodes) {
-  els.output.replaceChildren();
-  const frag = document.createDocumentFragment();
-  for (const n of nodes) {
-    const row = document.createElement('div');
-    row.className = 'tree-row';
-    const info = blockInfo(matcher.getBlock(n.code));
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = `char-chip hit-exact blk-${info.cls}`;
-    if (isPua(n.code)) chip.classList.add('pua-char');
-    chip.textContent = n.char;
-    chip.dataset.tip = chipTitle(n.code, info);
-    chip.addEventListener('click', () => copyChar(n.char, chip.dataset.tip));
-    const text = document.createElement('span');
-    text.className = 'tree-text';
-    text.textContent = n.text;
-    row.append(chip, text);
-    frag.appendChild(row);
+// 把 core.js exhaust() 輸出的括號嵌套文字(如「咅(立(亣一┇󰑻(亠丷)一)口)⻏」)
+// 解析成節點樹。文法：字元序列，每個字元後面可選跟一組「(子拆分)」；
+// 「┇」分隔同一個部件的多種拆法(一字多拆/同字異拆的內層分支)。
+// 頂層的「‖」已由 getTree() 先拆成多列，這裡不會遇到。
+function parseExpansion(s) {
+  let i = 0;
+  function parseAlts() {
+    const alts = [[]];
+    let cur = alts[0];
+    while (i < s.length && s[i] !== ')') {
+      if (s[i] === '┇') {
+        cur = [];
+        alts.push(cur);
+        i++;
+        continue;
+      }
+      let w = s[i++];
+      const c = w.charCodeAt(0);
+      if (c >= 0xD800 && c <= 0xDBFF) w += s[i++];
+      const node = { char: w, alts: null };
+      if (s[i] === '(') {
+        i++;
+        node.alts = parseAlts();
+        if (s[i] === ')') i++;
+      }
+      cur.push(node);
+    }
+    return alts;
   }
-  els.output.appendChild(frag);
+  return parseAlts();
+}
+
+// 渲染成真正的「自上而下」節點樹(org-chart 風格)：巢狀 ul/li + flexbox，
+// 連接線用 li 的 ::before/::after(水平軌+垂直落線)與 ul 的 ::before
+// (父節點往下的落線)畫出來。同一個部件有多種內層拆法(┇)時，各拆法的
+// 子節點群之間插一顆「或」節點做分隔。
+function buildTreeNodes(seqAlts) {
+  const ul = document.createElement('ul');
+  seqAlts.forEach((seq, idx) => {
+    if (idx > 0) {
+      const sep = document.createElement('li');
+      sep.className = 'tree-alt-sep';
+      const chip = document.createElement('span');
+      chip.className = 'tree-alt-chip';
+      chip.textContent = '或';
+      sep.appendChild(chip);
+      ul.appendChild(sep);
+    }
+    for (const node of seq) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.className = 'tree-node';
+      if (isPua(node.char.codePointAt(0))) span.classList.add('pua-char');
+      span.textContent = node.char;
+      li.appendChild(span);
+      if (node.alts) li.appendChild(buildTreeNodes(node.alts));
+      ul.appendChild(li);
+    }
+  });
+  return ul;
+}
+
+// 一棵完整的拆分樹：根節點是字本身，text 是 getTree() 一列的展開文字。
+// 「(不再分解)」是 getTree 的特殊字串，表示這個字是終端部件。
+function buildSplitTree(char, text) {
+  const box = document.createElement('div');
+  box.className = 'split-tree';
+  if (text === '(不再分解)') {
+    box.classList.add('split-tree-leaf');
+    box.textContent = '（終端部件，不再分解）';
+    return box;
+  }
+  const rootUl = document.createElement('ul');
+  rootUl.className = 'tree-chart';
+  const rootLi = document.createElement('li');
+  const rootSpan = document.createElement('span');
+  rootSpan.className = 'tree-node tree-root';
+  if (isPua(char.codePointAt(0))) rootSpan.classList.add('pua-char');
+  rootSpan.textContent = char;
+  rootLi.appendChild(rootSpan);
+  rootLi.appendChild(buildTreeNodes(parseExpansion(text)));
+  rootUl.appendChild(rootLi);
+  box.appendChild(rootUl);
+  return box;
+}
+
+// 由字元直接打開字詳情(「\字」語法、舊版 ?mode=tree 連結用)。
+// core.js 的 code 編碼對 BMP 是 charCode、對輔助平面等於真實 code point
+// (推導見 doc/04)，所以直接用 codePointAt 即可。
+function openDetailForChar(s) {
+  const cp = s.codePointAt(0);
+  if (cp === undefined) return;
+  const char = String.fromCodePoint(cp);
+  showCharDetail(char, cp, blockInfo(matcher.getBlock(cp)));
+}
+
+// 字詳情：點一個字後，右側面板**一次列出**全部資訊，不需要再點按鈕展開——
+// 大字、碼位/字源、外部字典(放頂部、做醒目)、拆分樹(多種拆法左右並排、
+// 容器可橫向捲動)。PUA 補充字沒有正式碼位，外部字典查不到，以一行說明
+// 代替連結。拆字功能統一在這個面板呈現，主查詢區不再有拆字分頁。
+let lastDetail = null;
+
+function showCharDetail(char, code, info) {
+  lastDetail = { char, code, info };
+  setSideView('detail');
+  setCollapsed(false);
+  els.charDetail.replaceChildren();
+
+  // 詳情可以直接關掉，關掉後回到部件鍵盤(部首表)
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'char-detail-close';
+  close.textContent = '✕';
+  close.dataset.tip = '關閉詳情，回到部件鍵盤';
+  close.addEventListener('click', () => setSideView('keypad'));
+  els.charDetail.appendChild(close);
+
+  const tip = chipTitle(code, info);
+  const big = document.createElement('div');
+  big.className = 'char-detail-char';
+  if (isPua(code)) big.classList.add('pua-char');
+  big.textContent = char;
+
+  const meta = document.createElement('div');
+  meta.className = 'char-detail-meta';
+  meta.textContent = tip;
+
+  els.charDetail.append(big, meta);
+
+  // 外部字典查詢放最頂部(大字下方)，是詳情面板的主要動作
+  if (isPua(code)) {
+    const note = document.createElement('p');
+    note.className = 'char-detail-note';
+    note.textContent = '此字尚未正式編碼，目前暫用私有造字區(PUA)碼位，外部字典無法以碼位查詢，故不提供連結。';
+    els.charDetail.appendChild(note);
+  } else {
+    const links = document.createElement('div');
+    links.className = 'char-detail-links';
+    for (const dict of EXTERNAL_DICTS) {
+      const a = document.createElement('a');
+      a.className = 'char-detail-link';
+      a.href = dict.url(char);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = dict.name;
+      links.appendChild(a);
+    }
+    els.charDetail.appendChild(links);
+  }
+
+  // 拆分樹：尊重「同字異拆」選項(對應 AGENTS.md 黃金案例的 \主 行為)——
+  // 未勾選只畫第一種拆法，但提示還有幾種；勾選則全部左右並排。
+  const d = els.subdivide.checked;
+  const all = matcher.getTree(char, true);
+  const trees = d ? all : all.slice(0, 1);
+  if (trees.length) {
+    const label = document.createElement('div');
+    label.className = 'char-detail-label';
+    label.textContent = all.length > 1 ? `拆分（${all.length} 種拆法）` : '拆分';
+    els.charDetail.appendChild(label);
+    const wrap = document.createElement('div');
+    wrap.className = 'split-trees';
+    for (const t of trees) wrap.appendChild(buildSplitTree(char, t.text));
+    els.charDetail.appendChild(wrap);
+    if (!d && all.length > 1) {
+      const note = document.createElement('p');
+      note.className = 'char-detail-note';
+      note.textContent = `另有 ${all.length - 1} 種拆法，勾選「同字異拆」可全部顯示。`;
+      els.charDetail.appendChild(note);
+    }
+  }
 }
 
 // 即時 tooltip：原生 title 有內建約一秒的顯示延遲且無法調整，改用事件委託
@@ -302,12 +503,6 @@ function doSearch(max, { settle = false, sync = true } = {}) {
 
 function runMatch(raw, max) {
   const d = els.subdivide.checked;
-  if (mode === 'tree') {
-    const nodes = matcher.getTree(raw, d);
-    renderTree(nodes);
-    els.counter.textContent = `「${raw}」共 ${nodes.length} 種拆法`;
-    return;
-  }
   const start = performance.now();
   const v = els.variant.checked;
   const u = els.ucodeOnly.checked;
@@ -356,27 +551,34 @@ async function main() {
   const ms = (performance.now() - t0).toFixed(0);
   els.status.textContent = `資料載入完成（${ms} ms）`;
 
-  els.tabSearch.addEventListener('click', () => setMode('search'));
-  els.tabTree.addEventListener('click', () => setMode('tree'));
   els.search.addEventListener('click', runSearch);
-  // 選項變更立即反映到網址(replace)並重跑即時查詢
+  // 選項變更立即反映到網址(replace)並重跑即時查詢；
+  // 「同字異拆」同時刷新開著的字詳情(拆分樹的數量跟著這個選項變)
   for (const el of [els.variant, els.subdivide, els.ucodeOnly]) {
     el.addEventListener('change', () => {
       syncUrl(false);
       scheduleLiveSearch();
+      if (el === els.subdivide && lastDetail && els.sidePanel.dataset.view === 'detail') {
+        showCharDetail(lastDetail.char, lastDetail.code, lastDetail.info);
+      }
     });
   }
   window.addEventListener('popstate', applyStateFromUrl);
   els.input.addEventListener('input', () => {
-    // 沿用 legacy 版的「\字」語法：在部件查字模式打「\」自動切到拆字分頁。
-    if (mode === 'search' && els.input.value.startsWith('\\')) {
+    // 沿用 legacy 版的「\字」語法：「\」後面跟一個字＝直接開那個字的字詳情
+    // (拆字已統一併入字詳情面板)。IME 組字中不觸發，避免吃掉組字過程。
+    if (!composing && els.input.value.startsWith('\\')) {
       const rest = els.input.value.slice(1);
-      els.input.value = '';
-      setMode('tree');
-      els.input.value = rest;
+      if (rest) {
+        els.input.value = rest;
+        openDetailForChar(rest);
+      }
     }
     scheduleLiveSearch();
   });
+  // 使用者把焦點放回輸入框＝要繼續組部件了，右側自動切回部件鍵盤；
+  // 字詳情要看時再點字塊就會回來。
+  els.input.addEventListener('focus', () => setSideView('keypad'));
   els.input.addEventListener('compositionstart', () => { composing = true; });
   els.input.addEventListener('compositionend', () => {
     composing = false;
@@ -390,13 +592,10 @@ async function main() {
     if (e.key === 'Escape') clearInput();
   });
   els.clear.addEventListener('click', clearInput);
+  els.sideTabKeypad.addEventListener('click', () => setSideView('keypad'));
+  els.sideTabDetail.addEventListener('click', () => setSideView('detail'));
   // 展開時只有「收起」小按鈕會觸發收合(面板本體是鍵盤,不能整塊都是開關)；
   // 收起後剩下的小條整塊都可以點擊展開。
-  const setCollapsed = (collapsed) => {
-    els.sidePanel.classList.toggle('collapsed', collapsed);
-    document.body.classList.toggle('panel-collapsed', collapsed);
-    els.togglePanel.textContent = collapsed ? '展開' : '收起';
-  };
   els.togglePanel.addEventListener('click', (e) => {
     e.stopPropagation();
     setCollapsed(!els.sidePanel.classList.contains('collapsed'));
@@ -406,9 +605,11 @@ async function main() {
   });
   // 手機(窄螢幕)上鍵盤是底部抽屜，預設收起，要用時再點開
   if (window.matchMedia('(max-width: 60rem)').matches) setCollapsed(true);
-  // 開啟分享連結時，還原 ?q=…&mode=…&v/d/u 狀態並直接執行查詢
-  applyStateFromUrl();
+  // 先 focus 再還原 URL 狀態——focus 會把右側切回鍵盤，
+  // 順序反了會蓋掉舊版 ?mode=tree 連結剛打開的字詳情
   els.input.focus();
+  // 開啟分享連結時，還原 ?q=…&v/d/u 狀態並直接執行查詢
+  applyStateFromUrl();
 }
 
 main();

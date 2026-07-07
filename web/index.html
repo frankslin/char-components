@@ -15,14 +15,9 @@
 
 <div class="layout">
   <main class="main">
-    <nav class="tabs" role="tablist">
-      <button class="tab active" id="tab-search" type="button" role="tab" aria-selected="true">部件查字</button>
-      <button class="tab" id="tab-tree" type="button" role="tab" aria-selected="false">拆字</button>
-    </nav>
-
     <div class="input-row">
       <div class="input-wrap">
-        <input id="input" type="text" placeholder="輸入部件，例如「日月」" autocomplete="off">
+        <input id="input" type="text" placeholder="輸入部件，例如「日月」；「\字」看單字拆分" autocomplete="off">
         <button id="clear" type="button" class="input-clear" title="清除">✕</button>
       </div>
       <button id="search" type="button" class="btn-primary">查詢</button>
@@ -30,9 +25,9 @@
 
     <div class="options">
       <label><input id="opt-live" type="checkbox" checked> 即時查詢</label>
-      <label data-mode="search"><input id="opt-variant" type="checkbox" checked> 包容異體</label>
+      <label><input id="opt-variant" type="checkbox" checked> 包容異體</label>
       <label><input id="opt-subdivide" type="checkbox"> 同字異拆</label>
-      <label data-mode="search"><input id="opt-ucodeonly" type="checkbox"> 排除未編碼補充字</label>
+      <label><input id="opt-ucodeonly" type="checkbox"> 排除未編碼補充字</label>
     </div>
 
     <div class="result-meta">
@@ -48,13 +43,21 @@
     </div>
   </main>
 
-  <aside class="side-panel" id="side-panel">
+  <aside class="side-panel" id="side-panel" data-view="keypad">
     <div class="side-panel-header">
-      <span>部件鍵盤</span>
+      <div class="side-panel-tabs" role="tablist">
+        <button class="side-tab active" id="side-tab-keypad" type="button" role="tab" aria-selected="true">部件鍵盤</button>
+        <button class="side-tab" id="side-tab-detail" type="button" role="tab" aria-selected="false">字詳情</button>
+      </div>
       <button id="toggle-panel" type="button" class="btn-ghost" title="收起/展開">收起</button>
     </div>
-    <div class="keypad" id="keypad">
-      <div class="keypad-grid" id="keypad-grid"></div>
+    <div class="panel-body">
+      <div class="keypad" id="keypad">
+        <div class="keypad-grid" id="keypad-grid"></div>
+      </div>
+      <div class="char-detail" id="char-detail">
+        <p class="char-detail-empty">點擊任一個查詢結果查看詳情</p>
+      </div>
     </div>
   </aside>
 </div>

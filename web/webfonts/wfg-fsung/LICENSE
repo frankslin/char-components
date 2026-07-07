@@ -1,0 +1,50 @@
+全宋體 (WFG FSung)
+Author: WFG (fgwang.blogspot.com)
+Source: https://fgwang.blogspot.com/2025/09/unicode-17.html
+Package generated: 2025/09/24 build of 全宋體
+
+SPDX-style identifier used in package.json: LicenseRef-WFG-NonCommercial
+(This is NOT an OSI-approved or SPDX-registered license identifier. It is
+used here only as a machine-readable marker meaning "see this file for
+the actual, non-standard terms.")
+
+------------------------------------------------------------------------
+ORIGINAL TERMS (Traditional Chinese, as published by the author)
+------------------------------------------------------------------------
+
+現將此成果無條件分享出來，樂見學術研究、教育工作、個人閱讀這方面的運用，
+但請勿用做任何形式的商業營利行為。
+
+(來源：2023/10/11「漢字使用環境的建置 —— 部件檢索重要更新暨 Unicode 15.1
+全宋體更新」https://fgwang.blogspot.com/2023/10/unicode-151.html ；
+2025/09/12「漢字使用環境的建置——Unicode 17 全宋體更新」
+https://fgwang.blogspot.com/2025/09/unicode-17.html ，兩篇原文用語一致。)
+
+------------------------------------------------------------------------
+PLAIN-LANGUAGE SUMMARY (not a substitute for the original terms above)
+------------------------------------------------------------------------
+
+- Permitted: academic research, education, and personal reading/use,
+  online or offline, unconditionally.
+- Not permitted: any form of commercial / for-profit use.
+- The author asks (per the companion "部件檢索" authorization post,
+  https://fgwang.blogspot.com/2015/12/blog-post_30.html) that sites
+  embedding this font leave a comment on the blog noting where it is
+  used, and that the data/font sources be credited.
+- This is materially different from a permissive open-font license
+  (OFL/MIT/CC0): it does not grant a right to sell, sublicense, or
+  otherwise commercially exploit the font, modified or unmodified.
+
+------------------------------------------------------------------------
+WHAT THIS PACKAGE IS
+------------------------------------------------------------------------
+
+This package repackages 全宋體 (distributed by its author as seven whole
+TTF files) into 256-codepoint WOFF2 slices with a generated CSS file, for
+use as a self-hosted webfont. No glyphs were modified; only the file
+format, chunking, and packaging were changed.
+
+This package's non-commercial terms are stricter than many other
+permissively-licensed (OFL/MIT/CC0) CJK webfont packages -- read
+LICENSE and README.md before assuming this font can be used the same
+way as those.

@@ -27,6 +27,12 @@ package bundles every codepoint chunk (~163MB combined), jsDelivr rejects every 
 in it with 403, not just the oversized ones. unpkg has no such limit and serves the
 package correctly, so use unpkg instead.
 
+(This repo's own `web/` app doesn't use either CDN — it vendors a local copy at
+`web/webfonts/wfg-fsung/`, kept in sync with this directory by
+`webfonts/build-wfg-fsung.py`'s `sync_vendor_copy()`, so it has zero external
+runtime dependency and isn't affected by CDN proxy latency. Use the CDN links
+above only if you're consuming this package from a *different* project.)
+
 ```css
 body {
   font-family: 'WFG FSung', serif;

@@ -19,6 +19,7 @@ codepoints every shard happens to carry.
 """
 import io
 import logging
+import shutil
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -32,6 +33,11 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = ROOT / "deps" / "fonts"
 OUT_DIR = Path(__file__).resolve().parent / "wfg-fsung"
 FONTS_DIR = OUT_DIR / "fonts"
+# web/ 需要能不依賴任何外部服務獨立部署，字型不能只放在這裡(這份是給
+# wfg-fsung-webfonts npm 套件用的)，所以额外 vendor 一份到 web/webfonts/
+# 底下，供 web/style.css 用相對路徑載入。兩份必須是同一次 build 的產物，
+# 不可分別手動更新到不同版本，見 main() 結尾的 sync_vendor_copy()。
+VENDOR_DIR = ROOT / "web" / "webfonts" / "wfg-fsung"
 CSS_PATH = OUT_DIR / "wfg-fsung.css"
 
 PRIORITY = ["FSung-2", "FSung-m", "FSung-3", "FSung-F", "FSung-X", "FSung-1"]
@@ -148,6 +154,19 @@ def main():
     )
     CSS_PATH.write_text(header + "\n\n".join(css_rules) + "\n", encoding="utf-8")
     print(f"Wrote {CSS_PATH} ({len(css_rules)} rules)", file=sys.stderr)
+
+    sync_vendor_copy()
+
+
+def sync_vendor_copy():
+    """把生成結果連同 LICENSE 複製一份到 web/webfonts/wfg-fsung/。"""
+    vendor_fonts = VENDOR_DIR / "fonts"
+    if vendor_fonts.exists():
+        shutil.rmtree(vendor_fonts)
+    shutil.copytree(FONTS_DIR, vendor_fonts)
+    shutil.copy2(CSS_PATH, VENDOR_DIR / "wfg-fsung.css")
+    shutil.copy2(OUT_DIR / "LICENSE", VENDOR_DIR / "LICENSE")
+    print(f"Synced vendored copy to {VENDOR_DIR}", file=sys.stderr)
 
 
 if __name__ == "__main__":
