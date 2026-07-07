@@ -16,11 +16,16 @@ See [`LICENSE`](./LICENSE) for the full terms.
 <link rel="stylesheet" href="./wfg-fsung.css">
 ```
 
-Once published to npm, it can also be loaded from jsDelivr:
+Once published to npm, it can also be loaded from unpkg:
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/wfg-fsung-webfonts/wfg-fsung.css">
+<link rel="stylesheet" href="https://unpkg.com/wfg-fsung-webfonts@1.0.0/wfg-fsung.css">
 ```
+
+Note: jsDelivr's npm mode enforces a 150MB *total package* size limit — since this
+package bundles every codepoint chunk (~163MB combined), jsDelivr rejects every file
+in it with 403, not just the oversized ones. unpkg has no such limit and serves the
+package correctly, so use unpkg instead.
 
 ```css
 body {

@@ -1,4 +1,8 @@
-@import url('../webfonts/wfg-fsung/wfg-fsung.css');
+/* 用 unpkg 而非 jsDelivr：wfg-fsung-webfonts 整個 npm 包(含全部字型切片)
+   超過 jsDelivr 150MB 的限制，會被直接拒絕(對所有檔案回 403，不只是
+   超大的那個檔案)；unpkg 沒有這個包大小限制。web/ 因此不再依賴本機的
+   ../webfonts/ 相對路徑，可以真正獨立部署。 */
+@import url('https://unpkg.com/wfg-fsung-webfonts@1.0.0/wfg-fsung.css');
 
 /* 漢字優先複用系統內建宋體/明體(零下載)，系統字型缺字的碼位由瀏覽器
    逐字回退到 WFG FSung 的 webfont 切片(按 256 碼位分片、用到才下載)——
