@@ -22,6 +22,10 @@ const EXTERNAL_DICTS = [
   { name: 'Wiktionary(英)', url: (ch) => `https://en.wiktionary.org/wiki/${encodeURIComponent(ch)}` },
   { name: 'ウィクショナリー(日)', url: (ch) => `https://ja.wiktionary.org/wiki/${encodeURIComponent(ch)}` },
   { name: 'Unihan', url: (ch) => `https://www.unicode.org/cgi-bin/GetUnihanData.pl?codepoint=U%2B${ch.codePointAt(0).toString(16).toUpperCase()}` },
+  { name: '小學堂字形演變', url: (ch) => `https://xiaoxue.iis.sinica.edu.tw/yanbian?char=${encodeURIComponent(ch)}` },
+  { name: 'CTEXT', url: (ch) => `https://ctext.org/dictionary.pl?if=zh&char=${encodeURIComponent(ch)}` },
+  // GlyphWiki 以小寫十六進制碼位定址(字形維基，收錄大量罕見字形)
+  { name: 'GlyphWiki', url: (ch) => `https://glyphwiki.org/wiki/u${ch.codePointAt(0).toString(16)}` },
 ];
 
 // 「相容表意文字」區都是外觀與基本區重複的相容碼位，一般使用者不該把它們
@@ -508,8 +512,11 @@ function runMatch(raw, max) {
   const u = els.ucodeOnly.checked;
   const query = hasBlockFlag(raw) ? raw : DEFAULT_FLAGS + raw;
   const hits = matcher.getMatch(query, v, d, u, max);
-  const truncated = hits.length > max;
-  const shown = truncated ? hits.filter((h) => h.hit === 0 || hits.indexOf(h) < max) : hits;
+  // 精確命中排到最前面(如「木木」的「林」)；其餘維持拆分表原順序。
+  // 這是 UI 層的顯示排序，不動 core.js 的比對結果本身。
+  const ordered = [...hits.filter((h) => h.hit === 0), ...hits.filter((h) => h.hit !== 0)];
+  const truncated = ordered.length > max;
+  const shown = truncated ? ordered.filter((h, i) => h.hit === 0 || i < max) : ordered;
   renderHits(shown, truncated);
   const elapsed = ((performance.now() - start) / 1000).toFixed(3);
   els.counter.textContent = `「${raw}」總計 ${hits.length} 字（${elapsed} 秒）`;
