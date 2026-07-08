@@ -158,6 +158,51 @@ h1 {
 .input-clear:hover { color: var(--fg); }
 .input-wrap:has(#input:placeholder-shown) .input-clear { display: none; }
 
+/* 部首名稱自動完成：輸入「三點」等部分名稱時浮出的候選清單 */
+.suggest {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 14rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 14%);
+  z-index: 6;
+  overflow: hidden;
+}
+
+.suggest-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0.45rem 0.75rem;
+  font-size: 14px;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+}
+
+.suggest-item.active, .suggest-item:hover { background: var(--bg-subtle); }
+
+.suggest-item .suggest-char {
+  font-family: var(--font-han);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.suggest-hint {
+  padding: 0.25rem 0.75rem 0.4rem;
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
 #input:focus {
   outline: 2px solid var(--accent);
   outline-offset: -1px;

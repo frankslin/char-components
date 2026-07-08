@@ -2,6 +2,7 @@ import { loadData } from './data.js';
 import { createMatcher } from './core.js';
 import { parseKeypad } from './keypad.js';
 import { BLOCKS, blockInfo } from './blocks.js';
+import { RADICAL_ENTRIES } from './radicals.js';
 
 const LIVE_MAX_RESULTS = 500;
 const FULL_MAX_RESULTS = 3000;
@@ -48,6 +49,7 @@ const els = {
   subdivide: document.getElementById('opt-subdivide'),
   ucodeOnly: document.getElementById('opt-ucodeonly'),
   counter: document.getElementById('counter'),
+  suggest: document.getElementById('suggest'),
   output: document.getElementById('output'),
   status: document.getElementById('status'),
   toast: document.getElementById('toast'),
@@ -61,9 +63,17 @@ const els = {
   charDetail: document.getElementById('char-detail'),
 };
 
+// 窄螢幕(手機)判斷：不快取，轉橫屏/縮放視窗時即時反映
+function isMobile() {
+  return window.matchMedia('(max-width: 60rem)').matches;
+}
+
 // 側欄「收起/展開」：跟 setSideView 一樣拉到模組層級，因為點字塊觸發的
 // showCharDetail() 也需要在使用者收起面板時自動展開，讓詳情看得到。
 function setCollapsed(collapsed) {
+  // 手機上抽屜展開時讓輸入框失焦，收掉系統輸入法鍵盤——
+  // 部首鍵盤與系統鍵盤互斥，不能同時佔下半屏
+  if (!collapsed && isMobile()) els.input.blur();
   els.sidePanel.classList.toggle('collapsed', collapsed);
   document.body.classList.toggle('panel-collapsed', collapsed);
   els.togglePanel.textContent = collapsed ? '展開' : '收起';
@@ -144,10 +154,18 @@ function hitClass(hit) {
   return hit ? 'hit-fuzzy' : 'hit-exact';
 }
 
-// 插入字元到目前游標位置（覆蓋選取範圍），並讓輸入框保持焦點與正確的游標位置。
+// 插入字元到目前游標位置（覆蓋選取範圍）。
 // selectionStart/selectionEnd 本來就是以 UTF-16 code unit 計算，
 // 跟原版手刻的 surrogate pair 位移邏輯效果相同，不需要另外處理。
+// 手機上**刻意不奪取焦點**：部首鍵盤跟系統輸入法鍵盤是互斥的兩種輸入
+// 方式，點部首鍵若 focus() 輸入框，系統鍵盤會彈出來跟底部抽屜互相頂。
+// 無焦點時游標位置不可靠(iOS 會歸零)，直接附加到字串末尾——連續點
+// 部件本來就是順序追加。
 function insertAtCursor(el, text) {
+  if (isMobile() && document.activeElement !== el) {
+    el.value += text;
+    return;
+  }
   const start = el.selectionStart ?? el.value.length;
   const end = el.selectionEnd ?? el.value.length;
   el.value = el.value.slice(0, start) + text + el.value.slice(end);
@@ -333,13 +351,19 @@ function showCharDetail(char, code, info) {
   setCollapsed(false);
   els.charDetail.replaceChildren();
 
-  // 詳情可以直接關掉，關掉後回到部件鍵盤(部首表)
+  // 詳情可以直接關掉：桌面回到部件鍵盤(側欄常駐)；手機的側欄是底部
+  // 抽屜，✕ 要把抽屜整個收起，不然「關掉詳情卻換成鍵盤繼續佔半屏」
+  // 會讓人覺得面板關不掉。
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'char-detail-close';
   close.textContent = '✕';
-  close.dataset.tip = '關閉詳情，回到部件鍵盤';
-  close.addEventListener('click', () => setSideView('keypad'));
+  close.dataset.tip = '關閉詳情';
+  close.addEventListener('click', (e) => {
+    e.stopPropagation(); // 別冒泡到側欄的「收起條點擊展開」監聽器，否則又被展開
+    setSideView('keypad');
+    if (isMobile()) setCollapsed(true);
+  });
   els.charDetail.appendChild(close);
 
   const tip = chipTitle(code, info);
@@ -533,8 +557,122 @@ function scheduleLiveSearch() {
   liveTimer = setTimeout(() => doSearch(LIVE_MAX_RESULTS), LIVE_DEBOUNCE_MS);
 }
 
+// 部首名稱自動完成：輸入尾端若是某個名稱的開頭(「三」「三點」⊂「三點水」)，
+// 在輸入框下方浮出候選清單，點擊或按 Tab 完成(↑↓ 選擇、Esc 關閉)。
+// 名稱總共就百來個，1 個字就開始提示；但「木」「三」這類字本身就是
+// 合法部件，所以尾端只匹配到 1 個字時，把「直接用這個字」放在第一位
+// 當預設項——Tab 只會關掉候選繼續用原字，不會被劫持成轉換。
+let suggestItems = [];
+let suggestActive = 0;
+
+function updateSuggestions() {
+  const v = els.input.value;
+  const found = [];
+  for (const [name, ch] of RADICAL_ENTRIES) {
+    // 找輸入尾端與名稱開頭的最長重疊(不含整個名稱——完整名稱已被自動轉換)
+    for (let k = Math.min(name.length - 1, v.length); k >= 1; k--) {
+      if (name.startsWith(v.slice(v.length - k))) {
+        found.push({ name, ch, k });
+        break;
+      }
+    }
+  }
+  found.sort((a, b) => b.k - a.k || a.name.localeCompare(b.name));
+  // 同一部件常有多個名稱命中(簡繁拼寫、別名)，同一個目標部件只留一項
+  const seen = new Set();
+  suggestItems = found.filter((it) => !seen.has(it.ch) && seen.add(it.ch)).slice(0, 6);
+  // 尾端只匹配到 1 個字：該字本身可能就是要找的部件，字面選項排第一；
+  // 目標部件跟原字相同的名稱項(「木字旁」→木)沒有資訊量，一併濾掉
+  if (suggestItems.length && suggestItems[0].k === 1) {
+    const tail = v.slice(-1);
+    suggestItems = suggestItems.filter((it) => it.ch !== tail);
+    suggestItems.unshift({ name: `直接用「${tail}」`, ch: tail, k: 1, literal: true });
+    suggestItems = suggestItems.slice(0, 7);
+  }
+  renderSuggestions();
+}
+
+function renderSuggestions() {
+  suggestActive = 0;
+  if (!suggestItems.length) {
+    els.suggest.hidden = true;
+    els.suggest.replaceChildren();
+    return;
+  }
+  els.suggest.replaceChildren();
+  suggestItems.forEach((it, idx) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'suggest-item' + (idx === 0 ? ' active' : '');
+    const name = document.createElement('span');
+    name.textContent = it.name;
+    const chSpan = document.createElement('span');
+    chSpan.className = 'suggest-char';
+    if (isPua(it.ch.codePointAt(0))) chSpan.classList.add('pua-char');
+    chSpan.textContent = it.ch;
+    btn.append(name, chSpan);
+    // mousedown 會把焦點從輸入框搶走，preventDefault 保住焦點再處理點擊
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => acceptSuggestion(idx));
+    els.suggest.appendChild(btn);
+  });
+  const hint = document.createElement('div');
+  hint.className = 'suggest-hint';
+  hint.textContent = 'Tab 完成 · ↑↓ 選擇 · Esc 關閉';
+  els.suggest.appendChild(hint);
+  els.suggest.hidden = false;
+}
+
+function highlightSuggestion(idx) {
+  suggestActive = (idx + suggestItems.length) % suggestItems.length;
+  els.suggest.querySelectorAll('.suggest-item').forEach((el, i) => {
+    el.classList.toggle('active', i === suggestActive);
+  });
+}
+
+function acceptSuggestion(idx) {
+  const it = suggestItems[idx];
+  if (!it) return;
+  if (it.literal) {
+    // 字面選項：輸入本來就是這個字，收起候選即可
+    hideSuggestions();
+    return;
+  }
+  const v = els.input.value;
+  els.input.value = v.slice(0, v.length - it.k) + it.ch;
+  hideSuggestions();
+  scheduleLiveSearch();
+}
+
+function hideSuggestions() {
+  suggestItems = [];
+  els.suggest.hidden = true;
+  els.suggest.replaceChildren();
+}
+
+// 偏旁口語名稱自動轉換：偵測輸入裡的「三點水」「豎心旁」等名稱(見
+// radicals.js)，替換成對應部件並以 toast 回饋。IME 組字中不執行——
+// 名稱通常在 compositionend 整詞上屏後才完整出現。
+function convertRadicalNames() {
+  let v = els.input.value;
+  const done = [];
+  for (const [name, ch] of RADICAL_ENTRIES) {
+    if (v.includes(name)) {
+      v = v.replaceAll(name, ch);
+      done.push(`${name}→${ch}`);
+    }
+  }
+  if (!done.length) return;
+  els.input.value = v;
+  els.toast.textContent = `已轉換 ${done.join('、')}`;
+  els.toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1600);
+}
+
 function clearInput() {
   searchToken++; // 作廢排程中的檢索，避免清除後結果又冒出來
+  hideSuggestions();
   els.input.value = '';
   els.counter.textContent = '';
   els.output.replaceChildren();
@@ -571,28 +709,44 @@ async function main() {
     });
   }
   window.addEventListener('popstate', applyStateFromUrl);
+  // 「\字」語法已移除——查到字後直接點字塊就能看拆分詳情，語法冗餘；
+  // 舊版 ?mode=tree 分享連結仍由 applyStateFromUrl() 相容處理。
   els.input.addEventListener('input', () => {
-    // 沿用 legacy 版的「\字」語法：「\」後面跟一個字＝直接開那個字的字詳情
-    // (拆字已統一併入字詳情面板)。IME 組字中不觸發，避免吃掉組字過程。
-    if (!composing && els.input.value.startsWith('\\')) {
-      const rest = els.input.value.slice(1);
-      if (rest) {
-        els.input.value = rest;
-        openDetailForChar(rest);
-      }
+    if (!composing) {
+      convertRadicalNames();
+      updateSuggestions();
     }
     scheduleLiveSearch();
   });
-  // 使用者把焦點放回輸入框＝要繼續組部件了，右側自動切回部件鍵盤；
-  // 字詳情要看時再點字塊就會回來。
-  els.input.addEventListener('focus', () => setSideView('keypad'));
+  // 使用者把焦點放回輸入框：桌面自動切回部件鍵盤(字詳情要看時再點字塊)；
+  // 手機上系統輸入法鍵盤即將彈出，底部抽屜自動收起讓位，
+  // 避免兩個「鍵盤」同時佔滿下半屏。
+  els.input.addEventListener('focus', () => {
+    if (isMobile()) setCollapsed(true);
+    else setSideView('keypad');
+  });
   els.input.addEventListener('compositionstart', () => { composing = true; });
   els.input.addEventListener('compositionend', () => {
     composing = false;
+    convertRadicalNames();
+    updateSuggestions();
     scheduleLiveSearch();
   });
+  els.input.addEventListener('blur', () => hideSuggestions());
   els.input.addEventListener('keydown', (e) => {
+    // 自動完成候選開著時，Tab/↑↓/Esc 先給候選清單用
+    if (suggestItems.length) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        acceptSuggestion(suggestActive);
+        return;
+      }
+      if (e.key === 'ArrowDown') { e.preventDefault(); highlightSuggestion(suggestActive + 1); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); highlightSuggestion(suggestActive - 1); return; }
+      if (e.key === 'Escape') { hideSuggestions(); return; }
+    }
     if (e.key === 'Enter') {
+      hideSuggestions();
       clearTimeout(liveTimer);
       runSearch();
     }

@@ -17,8 +17,9 @@
   <main class="main">
     <div class="input-row">
       <div class="input-wrap">
-        <input id="input" type="text" placeholder="輸入部件，例如「日月」；「\字」看單字拆分" autocomplete="off">
+        <input id="input" type="text" placeholder="輸入部件，如「日月」；可打「三點水」等部首名" autocomplete="off">
         <button id="clear" type="button" class="input-clear" title="清除">✕</button>
+        <div class="suggest" id="suggest" hidden></div>
       </div>
       <button id="search" type="button" class="btn-primary">查詢</button>
     </div>
