@@ -61,6 +61,7 @@ const els = {
   sideTabKeypad: document.getElementById('side-tab-keypad'),
   sideTabDetail: document.getElementById('side-tab-detail'),
   charDetail: document.getElementById('char-detail'),
+  panelBody: document.getElementById('panel-body'),
 };
 
 // 窄螢幕(手機)判斷：不快取，轉橫屏/縮放視窗時即時反映
@@ -314,6 +315,10 @@ function showCharDetail(char, code, info) {
   lastDetail = { char, code, info };
   setSideView('detail');
   setCollapsed(false);
+  // keypad 跟字詳情共用同一個捲動容器(panel-body)，捲動位置會留在切換前
+  // 的地方——如果使用者剛才把鍵盤捲到很下面，新詳情的頂部(關閉鈕/大字)
+  // 會被捲出畫面外，看起來像沒反應。每次顯示新詳情都捲回頂部。
+  els.panelBody.scrollTop = 0;
   els.charDetail.replaceChildren();
 
   // 詳情可以直接關掉：桌面回到部件鍵盤(側欄常駐)；手機的側欄是底部
