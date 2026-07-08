@@ -96,7 +96,7 @@ function stateToParams() {
   const p = new URLSearchParams();
   if (els.input.value) p.set('q', els.input.value);
   if (!els.variant.checked) p.set('v', '0');
-  if (els.subdivide.checked) p.set('d', '1');
+  if (!els.subdivide.checked) p.set('d', '0');
   if (els.ucodeOnly.checked) p.set('u', '1');
   return p;
 }
@@ -120,7 +120,7 @@ function syncUrl(settle = false) {
 function applyStateFromUrl() {
   const p = new URLSearchParams(location.search);
   els.variant.checked = p.get('v') !== '0';
-  els.subdivide.checked = p.get('d') === '1';
+  els.subdivide.checked = p.get('d') !== '0';
   els.ucodeOnly.checked = p.get('u') === '1';
   const q = p.get('q') ?? '';
   els.input.value = q;
