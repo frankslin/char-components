@@ -174,15 +174,10 @@ function insertAtCursor(el, text) {
   el.setSelectionRange(pos, pos);
 }
 
-// 每個字塊是「本體按鈕 + hover 才浮現的小工具列」組成的 wrap：
-// 直接點字塊＝預設動作(複製)；hover 出現的工具列可以另外選「拆字查詢」
-// (切到拆字分頁查這個字)或「查字典」(開 zi.tools 新分頁)。三種動作都會
-// 同時把右側面板切到「字詳情」顯示這個字的碼位/拆分/快速動作——
-// 觸控裝置沒有 hover，摸不到工具列，但字詳情面板裡有同樣的三顆按鈕可用。
+// 結果字塊：點擊＝複製到剪貼簿＋打開右側字詳情(拆分樹、外部字典連結
+// 都在詳情裡)。曾經做過 hover 浮現的小工具列(複製/查字典)，後來移除——
+// 點擊本來就會複製，查字典在詳情面板有更完整的入口，工具列是冗餘。
 function buildCharChip(char, code, info, chipClass) {
-  const wrap = document.createElement('span');
-  wrap.className = 'chip-wrap';
-
   const tip = chipTitle(code, info);
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -194,37 +189,7 @@ function buildCharChip(char, code, info, chipClass) {
     copyChar(char, tip);
     showCharDetail(char, code, info);
   });
-
-  const actions = document.createElement('div');
-  actions.className = 'chip-actions';
-  actions.appendChild(
-    buildChipAction('⧉', '複製', () => {
-      copyChar(char, tip);
-      showCharDetail(char, code, info);
-    }),
-  );
-  // PUA 補充字沒有正式碼位，外部字典查不到，不提供字典入口
-  if (!isPua(code)) {
-    actions.appendChild(buildChipAction('典', `查${EXTERNAL_DICTS[0].name}`, () => {
-      showCharDetail(char, code, info);
-      window.open(EXTERNAL_DICTS[0].url(char), '_blank', 'noopener');
-    }));
-  }
-  wrap.append(btn, actions);
-  return wrap;
-}
-
-function buildChipAction(label, tip, fn) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'chip-action';
-  b.textContent = label;
-  b.dataset.tip = tip;
-  b.addEventListener('click', (e) => {
-    e.stopPropagation();
-    fn();
-  });
-  return b;
+  return btn;
 }
 
 function renderHits(hits, truncated) {

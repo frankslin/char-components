@@ -422,47 +422,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   padding: 0.25rem 0.35rem;
 }
 
-/* 每個字塊包一層 wrap：本體按鈕(預設點擊=複製) + hover 才浮現的
-   小工具列(複製/拆字查詢/查字典)。工具列是 chip 的手足元素，不是子元素，
-   所以點工具列按鈕不會被本體按鈕的 click 攔截。 */
-.chip-wrap { position: relative; display: inline-flex; }
-
-.chip-actions {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translate(-50%, 4px);
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 14%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.1s ease;
-  z-index: 4;
-}
-
-.chip-wrap:hover .chip-actions,
-.chip-wrap:focus-within .chip-actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.chip-action {
-  border: none;
-  background: none;
-  padding: 0.25rem 0.45rem;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: 5px;
-  color: var(--muted);
-}
-
-.chip-action:hover { background: var(--bg-subtle); color: var(--fg); }
-
 /* 字源圖例：純顏色說明，不可點擊，直接展開顯示 */
 .legend-wrap {
   font-size: 13px;
