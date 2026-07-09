@@ -470,6 +470,7 @@ function buildKeypad(categories) {
 }
 
 let matcher;
+let dtData; // 碼位查詢需要直接查 dt 字頭驗證「已收錄」，main() 載入後賦值
 let composing = false;
 let liveTimer;
 let searchToken = 0;
@@ -499,7 +500,50 @@ function doSearch(max, { settle = false, sync = true } = {}) {
   }, 0));
 }
 
+// 「檢索碼位」：整個輸入若是碼位寫法——U+4E00 / u+f0200 / 0x4E00 帶前綴，
+// 或 4~6 位裸十六進位(如 4E00、F0200)——改走碼位查詢，不做部件比對。
+// 裸十六進位不會跟部件查詢衝突：十六進位裡的 ASCII 字母與數字本來就不是
+// 部件，這種輸入在部件查詢下只會得到空結果(A~F 還會被當成區塊旗標)。
+// 前綴後的「+」也接受空格——手打分享連結 ?q=U+4E00 時「+」會被網址解碼成空格。
+function parseCodepointQuery(raw) {
+  const s = raw.trim();
+  const m = s.match(/^(?:[Uu][+ ]?|[Xx][+ ]|0[Xx])([0-9A-Fa-f]{1,6})$/) || s.match(/^([0-9A-Fa-f]{4,6})$/);
+  if (!m) return null;
+  const cp = parseInt(m[1], 16);
+  return cp <= 0x10FFFF ? cp : null;
+}
+
+// 碼位查詢的結果呈現：命中已收錄字(含 PUA 補充字與部件)時列出單一字塊；
+// jump=true(按查詢/Enter/分享連結的完整查詢)時直接打開字詳情——即時查詢
+// 的逐鍵更新不跳詳情，不然桌面上面板會隨打字亂切、手機上底部抽屜會彈出來
+// 跟系統鍵盤互頂(setCollapsed(false) 會讓輸入框失焦)。
+// 「已收錄」的判定：getIndex() 能換算出下標，且該 dt 條目的字頭就是這個字。
+// 下標 1~10 是 A~J 旗標的保留列，不是真的字，排除；11~48 的保留列是鍵盤
+// 部件(⺀、㇀ 之類)，屬於可查詢的合法目標。
+function renderCodepointResult(cp, raw, jump) {
+  const label = `U+${cp.toString(16).toUpperCase().padStart(4, '0')}`;
+  const i = matcher.getIndex(cp);
+  const known = i > 10 && dtData[i] !== undefined && dtData[i].codePointAt(0) === cp;
+  if (!known) {
+    els.output.replaceChildren();
+    els.counter.textContent = `碼位 ${label} 不在收錄範圍`;
+    return;
+  }
+  const char = String.fromCodePoint(cp);
+  const info = blockInfo(matcher.getBlock(cp));
+  renderHits([{ char, code: cp, hit: 0, block: matcher.getBlock(cp) }], false);
+  els.counter.textContent = info.cls === 'sup'
+    ? `碼位 ${label} → 「${char}」（補充字，暫用私有碼位）`
+    : `碼位 ${label} → 「${char}」（${info.label}）`;
+  if (jump) showCharDetail(char, cp, info);
+}
+
 function runMatch(raw, max) {
+  const cp = parseCodepointQuery(raw);
+  if (cp !== null) {
+    renderCodepointResult(cp, raw, max >= FULL_MAX_RESULTS);
+    return;
+  }
   const d = els.subdivide.checked;
   const start = performance.now();
   const v = els.variant.checked;
@@ -658,6 +702,7 @@ async function main() {
   try {
     const { dt, rt, vt, kt } = await loadData('./data/');
     matcher = createMatcher(dt, rt, vt);
+    dtData = dt;
     buildKeypad(parseKeypad(kt));
   } catch (err) {
     els.status.textContent = `資料載入失敗：${err.message}`;

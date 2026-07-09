@@ -248,7 +248,12 @@ export function createMatcher(dt, rt, vt) {
         w += s.charAt(++j);
         c = ((c - 0xD800) << 10) + w.charCodeAt(1) + 0x2400;
       }
-      const p = dt[getIndex(c)].slice(j + 1);
+      // 換算不出下標的字元(未知字/佔位符「╳」)視為不再分解。原版沒有這個
+      // 防護，會拿 dt[0] 當拆分展開，而 dt[0] 的填充內容又含「╳」，遞迴到
+      // 自己身上直接堆疊溢位(legacy 版對拆分資料為佔位符的字同樣會當掉，
+      // 是少數刻意偏離逐字翻譯的修正)；eliminate() 對應的防護是 `if (idx)`。
+      const idx = getIndex(c);
+      const p = idx ? dt[idx].slice(j + 1) : '';
       let k = 0;
       for (let i = 0; i < p.length; i++) {
         w = p.charAt(i);
