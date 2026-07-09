@@ -1,0 +1,39 @@
+# npm trusted publisher 設定須與此檔一致：repo frankslin/char-components、
+# workflow publish-wfg-fsung.yml、environment npm-publish
+name: Publish wfg-fsung-webfonts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    defaults:
+      run:
+        working-directory: webfonts/wfg-fsung
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # OIDC 需要 npm >= 11.5.1，Node 24 自帶的即滿足；不要 npm install -g
+      # npm@latest 自我升級——會把自身裝壞(丟失 sigstore 等內建依賴)
+      - run: npm --version
+
+      - name: Fail early if version already published
+        run: |
+          PKG=$(node -p "require('./package.json').name")
+          VER=$(node -p "require('./package.json').version")
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then
+            echo "::error::$PKG@$VER 已存在於 npm，請先 bump 版本"
+            exit 1
+          fi
+
+      - run: npm publish --provenance
