@@ -1,13 +1,14 @@
 {
   "name": "wfg-fsung-webfonts",
-  "version": "1.0.0",
-  "description": "Chunked woff2 webfonts for 全宋體 (WFG FSung), the private-use-area supplemented Song-style font behind 部件檢索. Non-commercial use only -- see LICENSE.",
+  "version": "1.0.1",
+  "description": "Chunked woff2 webfonts for WFG「全宋體」(FSung), the private-use-area supplemented Song-style font behind 部件檢索. Non-commercial use only -- see LICENSE.",
   "license": "LicenseRef-WFG-NonCommercial",
   "main": "wfg-fsung.css",
   "style": "wfg-fsung.css",
   "files": [
     "wfg-fsung.css",
     "fonts",
+    "assets",
     "README.md",
     "LICENSE"
   ],
