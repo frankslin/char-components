@@ -254,6 +254,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .options label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
 .options input[type='checkbox'] { accent-color: var(--accent); }
 
+/* 輸入框用法提示(字號/碼位檢索的入口說明，放選項列之下、結果計數之上) */
+.input-hint {
+  margin: 0.35rem 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* 載入/檢索中的轉圈提示 */
 .spinner {
   display: inline-block;
