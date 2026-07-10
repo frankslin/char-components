@@ -1,4 +1,4 @@
-import { loadData, loadMoePua } from './data.js';
+import { loadData, getMoeRefs, findMoeCode } from './data.js';
 import { createMatcher } from './core.js';
 import { parseKeypad } from './keypad.js';
 import { BLOCKS, blockInfo } from './blocks.js';
@@ -18,7 +18,9 @@ const RENDER_WAVE_MAX_WAIT_MS = 1000;
 const EXTERNAL_DICTS = [
   { name: '字統網', url: (ch) => `https://zi.tools/zi/${encodeURIComponent(ch)}` },
   { name: '漢典', url: (ch) => `https://www.zdic.net/hans/${encodeURIComponent(ch)}` },
-  { name: '教育部異體字字典', url: (ch) => `https://dict.variants.moe.edu.tw/search.jsp?QTP=0&WORD=${encodeURIComponent(ch)}` },
+  // moe 旗標：字詳情面板會非同步查教育部字號對照表(見 getMoeRefs)，查到就把
+  // 這個「以字搜尋」的泛用連結原地換成一或多個字號直鏈(一字可兼多重身份)
+  { name: '教育部異體字字典', moe: true, url: (ch) => `https://dict.variants.moe.edu.tw/search.jsp?QTP=0&WORD=${encodeURIComponent(ch)}` },
   { name: '國學大師', url: (ch) => `https://www.guoxuedashi.net/zidian/so.php?sokeyzi=${encodeURIComponent(ch)}&kz=1` },
   { name: '萌典', url: (ch) => `https://www.moedict.tw/${encodeURIComponent(ch)}` },
   { name: '維基詞典(中)', url: (ch) => `https://zh.wiktionary.org/wiki/${encodeURIComponent(ch)}` },
@@ -381,6 +383,17 @@ function openDetailForChar(s) {
 // 代替連結。拆字功能統一在這個面板呈現，主查詢區不再有拆字分頁。
 let lastDetail = null;
 
+// 教育部異體字字典的字號直鏈(dictView 的 ID 出自對照表，直達該字號頁面)
+function moeRefLink(ref) {
+  const a = document.createElement('a');
+  a.className = 'char-detail-link';
+  a.href = `https://dict.variants.moe.edu.tw/dictView.jsp?ID=${ref.id}`;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = `教育部異體字字典 ${ref.code}`;
+  return a;
+}
+
 function showCharDetail(char, code, info) {
   lastDetail = { char, code, info };
   setSideView('detail');
@@ -418,33 +431,25 @@ function showCharDetail(char, code, info) {
 
   els.charDetail.append(big, meta);
 
-  // 外部字典查詢放最頂部(大字下方)，是詳情面板的主要動作
+  // 外部字典查詢放最頂部(大字下方)，是詳情面板的主要動作。
+  // 教育部異體字字典的字號對照表(見 web/data/README.md 的 moe/ 分片)是按需
+  // 非同步載入的：先同步畫出不依賴它的部分，對照查回來後再補/換內容——
+  // 補之前用 lastDetail 檢查使用者是否已點開別的字，是就直接丟棄這次結果。
+  const detail = lastDetail;
   if (isPua(code)) {
-    // PUA 補充字外部字典查不到，但其中四萬多字是《教育部異體字字典》的
-    // 字頭(見 web/data/README.md 的 moe-pua.jsonl)，有教育部字號就能直鏈
-    // 官網對應頁面。對照表是懶載入的，先掛佔位容器，載回來再填——填之前
-    // 用 lastDetail 檢查使用者是否已點開別的字，是就直接丟棄這次結果。
+    // PUA 補充字一般外部字典查不到，但其中四萬多字是《教育部異體字字典》
+    // 的字頭，有教育部字號就能直鏈官網對應頁面
     const holder = document.createElement('div');
     els.charDetail.appendChild(holder);
-    const detail = lastDetail;
-    loadMoePua().then((moe) => {
+    getMoeRefs(char).then((refs) => {
       if (lastDetail !== detail) return;
-      const refs = moe.get(char);
       const note = document.createElement('p');
       note.className = 'char-detail-note';
-      if (refs && refs.length) {
+      if (refs) {
         // 同一字可兼具多重身份(正字/異體/附字各有字號)，逐一列出
         const links = document.createElement('div');
         links.className = 'char-detail-links';
-        for (const ref of refs) {
-          const a = document.createElement('a');
-          a.className = 'char-detail-link';
-          a.href = `https://dict.variants.moe.edu.tw/dictView.jsp?ID=${ref.id}`;
-          a.target = '_blank';
-          a.rel = 'noopener';
-          a.textContent = `教育部異體字字典 ${ref.code}`;
-          links.appendChild(a);
-        }
+        for (const ref of refs) links.appendChild(moeRefLink(ref));
         note.textContent = '此字尚未正式編碼，暫用私有造字區(PUA)碼位，一般外部字典查不到；但它是《教育部異體字字典》的字頭，可由字號直達官網：';
         holder.append(note, links);
       } else {
@@ -455,6 +460,7 @@ function showCharDetail(char, code, info) {
   } else {
     const links = document.createElement('div');
     links.className = 'char-detail-links';
+    let moeAnchor = null;
     for (const dict of EXTERNAL_DICTS) {
       const a = document.createElement('a');
       a.className = 'char-detail-link';
@@ -463,8 +469,15 @@ function showCharDetail(char, code, info) {
       a.rel = 'noopener';
       a.textContent = dict.name;
       links.appendChild(a);
+      if (dict.moe) moeAnchor = a;
     }
     els.charDetail.appendChild(links);
+    // 已編碼字：查到字號就把泛用的「以字搜尋」連結原地換成字號直鏈，
+    // 比搜尋更精準(搜尋同形字可能命中多筆或失敗)；查不到就維持原連結
+    getMoeRefs(char).then((refs) => {
+      if (lastDetail !== detail || !refs) return;
+      moeAnchor.replaceWith(...refs.map(moeRefLink));
+    });
   }
 
   // 拆分樹：尊重「同字異拆」選項(對應 AGENTS.md 黃金案例的 \主 行為)——
@@ -636,10 +649,57 @@ function renderCodepointResult(cp, raw, jump) {
   if (jump) showCharDetail(char, cp, info);
 }
 
+// 「檢索字號」：整個輸入若是教育部異體字字典字號——A02353(正字)或
+// A02353-004(異體/附字，後綴須照官方零埋 3 位)——改走字號反查，不做部件
+// 比對。與裸十六進位碼位查詢零衝突：[A-C]開頭加 5 位數字若當十六進位讀
+// 必然 > 0x10FFFF，parseCodepointQuery() 會回 null；N 不是十六進位字母。
+// 裸正字號列出整個字族(正字＋全部異體/附字)，帶後綴的字號只列該字。
+function parseMoeCodeQuery(raw) {
+  const m = raw.trim().match(/^([ABCNabcn])(\d{5})((?:-\d{1,3}){0,2})$/);
+  return m ? `${m[1].toUpperCase()}${m[2]}${m[3]}` : null;
+}
+
+// 字號查詢的結果呈現。反查表是按需非同步載入的，回來後用 token 檢查這次
+// 查詢是否已過期(使用者又打了字)。jump 的行為比照碼位查詢：確認查詢才
+// 打開字詳情(裸正字號開正字的詳情)，即時查詢的逐鍵更新不跳。
+async function renderMoeCodeResult(code, token, jump) {
+  const res = await findMoeCode(code);
+  if (token !== searchToken) return;
+  const isZheng = code.length === 6; // 無後綴 = 正字號
+  const found = res && (isZheng ? res.family.length > 0 : res.exact !== null);
+  if (!found) {
+    clearOutput();
+    els.counter.textContent = `字號 ${code} 查無此字`;
+    return;
+  }
+  // 少數字族(24/29920)裡同一個字掛兩個字號(官方同形字)，字塊去重顯示——
+  // 點開詳情時正向表本來就會列出該字的全部字號
+  const seen = new Set();
+  const list = (isZheng ? res.family : [res.exact]).filter(({ char }) => !seen.has(char) && seen.add(char));
+  renderHits(list.map(({ char }) => {
+    const cp = char.codePointAt(0);
+    return { char, code: cp, hit: 0, block: matcher.getBlock(cp) };
+  }), false);
+  const zhengChar = list[0].char;
+  els.counter.textContent = isZheng
+    ? `字號 ${code} → 「${zhengChar}」字族共 ${list.length} 字`
+    : `字號 ${code} → 「${res.exact.char}」`;
+  if (jump) {
+    const ch = isZheng ? zhengChar : res.exact.char;
+    const cp = ch.codePointAt(0);
+    showCharDetail(ch, cp, blockInfo(matcher.getBlock(cp)));
+  }
+}
+
 function runMatch(raw, max) {
   const cp = parseCodepointQuery(raw);
   if (cp !== null) {
     renderCodepointResult(cp, raw, max >= FULL_MAX_RESULTS);
+    return;
+  }
+  const moeCode = parseMoeCodeQuery(raw);
+  if (moeCode !== null) {
+    renderMoeCodeResult(moeCode, searchToken, max >= FULL_MAX_RESULTS);
     return;
   }
   const d = els.subdivide.checked;
