@@ -557,7 +557,13 @@ function runMatch(raw, max) {
   const shown = truncated ? ordered.filter((h, i) => h.hit === 0 || i < max) : ordered;
   renderHits(shown, truncated);
   const elapsed = ((performance.now() - start) / 1000).toFixed(3);
-  els.counter.textContent = `「${raw}」總計 ${hits.length} 字（${elapsed} 秒）`;
+  // core.js getMatch() 沿用 legacy 的 `out.length <= m` 哨兵設計：模糊命中
+  // 最多收到 m+1 條，多出的一條只用來偵測「超過上限」。所以截斷時不能把
+  // hits.length 當總數顯示(那只是被截斷的列表長度，恆為 501 之類)，要照
+  // legacy 顯示「超過 m 字」。
+  els.counter.textContent = truncated
+    ? `「${raw}」超過 ${max} 字（${elapsed} 秒）`
+    : `「${raw}」總計 ${hits.length} 字（${elapsed} 秒）`;
 }
 
 function runSearch() {
