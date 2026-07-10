@@ -7,6 +7,8 @@ import { RADICAL_ENTRIES } from './radicals.js';
 const LIVE_MAX_RESULTS = 500;
 const FULL_MAX_RESULTS = 3000;
 const LIVE_DEBOUNCE_MS = 120;
+const RENDER_WAVE_SIZE = 240;
+const RENDER_WAVE_MAX_WAIT_MS = 1000;
 
 // 外部字典：字詳情面板會把全部連結一次列出(PUA 補充字除外——沒有正式碼位，
 // 外部字典查不到)。字統網是 legacy 版預設的 `ref`；其餘 URL 格式都驗證過
@@ -132,7 +134,7 @@ function applyStateFromUrl() {
     if (p.get('mode') === 'tree') openDetailForChar(q);
   } else {
     els.counter.textContent = '';
-    els.output.replaceChildren();
+    clearOutput();
   }
 }
 
@@ -193,20 +195,88 @@ function buildCharChip(char, code, info, chipClass) {
   return btn;
 }
 
-function renderHits(hits, truncated) {
+// 結果區的清空一律走這裡：遞增 renderToken 讓 renderHits() 還在排程中的
+// 後續波次作廢，避免舊查詢的字塊在新狀態(清除、查無碼位、空輸入)之後
+// 又冒出來。
+let renderToken = 0;
+
+function clearOutput() {
+  renderToken++;
   els.output.replaceChildren();
-  const frag = document.createDocumentFragment();
-  for (const h of hits) {
-    const info = blockInfo(h.block);
-    frag.appendChild(buildCharChip(h.char, h.code, info, `char-chip ${hitClass(h.hit)} blk-${info.cls}`));
-  }
-  els.output.appendChild(frag);
-  if (truncated) {
-    const note = document.createElement('div');
-    note.className = 'truncated-note';
-    note.textContent = `僅顯示前 ${hits.length} 字（精確命中一定會列出）；按「查詢」看完整結果。`;
-    els.output.appendChild(note);
-  }
+  return renderToken;
+}
+
+// 等「目前已觸發的字型下載」告一段落，最多等 maxWait 毫秒。
+// unicode-range 的 @font-face 是瀏覽器排版到用得著的字時才發請求，所以先讓
+// 瀏覽器畫一幀(rAF + setTimeout，同 doSearch 的招)讓這一波字塊的字型請求
+// 發出去，再輪詢 document.fonts.status 直到全部下載完或超時。
+function waitFontsSettled(maxWait) {
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const check = () => {
+      if (document.fonts.status === 'loaded' || performance.now() - t0 >= maxWait) resolve();
+      else setTimeout(check, 100);
+    };
+    requestAnimationFrame(() => setTimeout(check, 0));
+  });
+}
+
+// Chrome 的字型失效重排缺陷 workaround。實測(Chrome/macOS)：文字排版時它
+// 需要的 unicode-range 切片還沒下載完的話，Chrome 先用回退鏈裡系統有的字族
+// (Songti TC)畫 .notdef 方框佔位；切片到貨後本應重新排版換上真字形，但這個
+// 重排並不可靠——方框會永久卡在畫面上，即使 FontFace 狀態已是 loaded。帶
+// ?q= 直開時結果只渲染一次、渲染時切片必定還在下載，最容易踩中；手動輸入
+// 因為每鍵重建結果區而大多免疫，這就是「分享連結打開前幾個字是方框、手動搜
+// 同一批字卻正常」現象的成因。
+// 卡住的字**重建文字節點、切換 font-variant 都救不活**——中毒的是 Blink 按
+// 「字型描述(字族鏈+字號)」快取的回退解析結果，同一描述下怎麼重排都拿到
+// 同一份壞快取，實測只有改字號(換一把快取鍵)能強迫重新解析。所以
+// style.css 給所有顯示資料字的 font-size 乘上 --font-nudge 係數，這裡在
+// 每批字型下載完成(loadingdone)時換一個新值。兩個細節都是實測出來的：
+// (1)增量至少要 0.002——Blink 的字號快取鍵有約 1/64px 的量化，1.0001 這種
+// 等級的差異(24px 上 0.0024px)會量化回同一把中毒的鍵；(2)不能在兩個值
+// 之間來回翻——每個「字型還在下載時排過版」的值都可能中毒，翻回去就復發，
+// 要在一圈值裡單調輪轉、永不回到起始的 1。步長 0.002、十個值一圈，最大偏差
+// 2%(1.5rem 字塊差 0.5px)，肉眼與版面無感。
+let fontNudgeStep = 0;
+function reshapeAfterFontLoad() {
+  fontNudgeStep = (fontNudgeStep % 10) + 1;
+  document.documentElement.style.setProperty('--font-nudge', String(1 + fontNudgeStep * 0.002));
+}
+document.fonts.addEventListener('loadingdone', reshapeAfterFontLoad);
+
+// 結果分波渲染：一次把 3000 個字塊放進 DOM，會讓瀏覽器同時對幾百個字型
+// 切片(每片約 170KB，總量可達幾十 MB)發請求，全部擠在一起下載——排最前
+// 面的精確命中(往往是只有全宋體才有字形的 PUA 補充字/罕見字)反而要跟
+// 幾百個切片搶帶寬，看起來就是「前幾個字一直加載不出來」。改成每波
+// RENDER_WAVE_SIZE 個字塊(首波約蓋滿第一屏)，等上一波觸發的字型下載完
+// (或至多 RENDER_WAVE_MAX_WAIT_MS)再放下一波：結果前面的字永遠優先拿到
+// 帶寬，快取全熱時 fonts.status 立即是 loaded，各波幾乎連續、感受不到分批。
+function renderHits(hits, truncated) {
+  const token = clearOutput();
+  let i = 0;
+  const appendWave = () => {
+    if (token !== renderToken) return;
+    const frag = document.createDocumentFragment();
+    const end = Math.min(i + RENDER_WAVE_SIZE, hits.length);
+    for (; i < end; i++) {
+      const h = hits[i];
+      const info = blockInfo(h.block);
+      frag.appendChild(buildCharChip(h.char, h.code, info, `char-chip ${hitClass(h.hit)} blk-${info.cls}`));
+    }
+    els.output.appendChild(frag);
+    if (i < hits.length) {
+      waitFontsSettled(RENDER_WAVE_MAX_WAIT_MS).then(appendWave);
+      return;
+    }
+    if (truncated) {
+      const note = document.createElement('div');
+      note.className = 'truncated-note';
+      note.textContent = `僅顯示前 ${hits.length} 字（精確命中一定會列出）；按「查詢」看完整結果。`;
+      els.output.appendChild(note);
+    }
+  };
+  appendWave();
 }
 
 // 把 core.js exhaust() 輸出的括號嵌套文字(如「咅(立(亣一┇󰑻(亠丷)一)口)⻏」)
@@ -487,7 +557,7 @@ function doSearch(max, { settle = false, sync = true } = {}) {
   const token = ++searchToken;
   if (!raw) {
     els.counter.textContent = '';
-    els.output.replaceChildren();
+    clearOutput();
     return;
   }
   // 比對是同步計算、會佔住主執行緒，直接跑的話 spinner 根本畫不出來。
@@ -525,7 +595,7 @@ function renderCodepointResult(cp, raw, jump) {
   const i = matcher.getIndex(cp);
   const known = i > 10 && dtData[i] !== undefined && dtData[i].codePointAt(0) === cp;
   if (!known) {
-    els.output.replaceChildren();
+    clearOutput();
     els.counter.textContent = `碼位 ${label} 不在收錄範圍`;
     return;
   }
@@ -695,7 +765,7 @@ function clearInput() {
   hideSuggestions();
   els.input.value = '';
   els.counter.textContent = '';
-  els.output.replaceChildren();
+  clearOutput();
   els.input.focus();
   syncUrl(false);
 }

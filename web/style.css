@@ -18,6 +18,12 @@
   --font-han: 'Songti TC', 'Songti SC', 'SimSun', 'PMingLiU', 'MingLiU',
     'Noto Serif TC', 'Noto Serif CJK TC', 'WFG FSung', serif;
   --font-pua: 'WFG FSung', serif;
+  /* 肉眼不可見的字號縮放係數(1 ↔ 1.0001)。Chrome 對「排版時字型切片還沒
+     下載完」的字有時不會在切片到貨後重排，方框永久卡住(見 app.js 的
+     reshapeAfterFontLoad)；只有字號這類字型描述層級的樣式變更能強迫它
+     重建回退狀態，所以所有顯示資料字的 font-size 都乘上這個係數，讓 JS
+     在字型到貨時翻轉一下。 */
+  --font-nudge: 1;
 }
 
 :root {
@@ -133,7 +139,7 @@ h1 {
 #input {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 1.25rem;
+  font-size: calc(1.25rem * var(--font-nudge));
   font-family: var(--font-han);
   padding: 0.45rem 2.2rem 0.45rem 0.75rem;
   border: 1px solid var(--border-strong);
@@ -192,7 +198,7 @@ h1 {
 
 .suggest-item .suggest-char {
   font-family: var(--font-han);
-  font-size: 1.25rem;
+  font-size: calc(1.25rem * var(--font-nudge));
   line-height: 1;
 }
 
@@ -291,7 +297,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
    命中類型只動文字：精確=綠、正體=橙、僅正體命中=淡化。 */
 .char-chip {
   font-family: var(--font-han);
-  font-size: 1.5rem;
+  font-size: calc(1.5rem * var(--font-nudge));
   line-height: 1;
   padding: 0.35rem 0.45rem;
   border-radius: 6px;
@@ -400,7 +406,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .tree-node {
   font-family: var(--font-han);
-  font-size: 1.15rem;
+  font-size: calc(1.15rem * var(--font-nudge));
   line-height: 1;
   padding: 0.3rem 0.4rem;
   border: 1px solid var(--border);
@@ -409,7 +415,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 
 .tree-root {
-  font-size: 1.4rem;
+  font-size: calc(1.4rem * var(--font-nudge));
   border-color: var(--border-strong);
 }
 
@@ -565,7 +571,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .char-detail-char {
   font-family: var(--font-han);
-  font-size: 3.5rem;
+  font-size: calc(3.5rem * var(--font-nudge));
   line-height: 1;
   text-align: center;
   padding: 0.5rem 0;
@@ -635,7 +641,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .keypad-key {
   font-family: var(--font-han);
-  font-size: 1.1rem;
+  font-size: calc(1.1rem * var(--font-nudge));
   line-height: 1.25;
   padding: 0.1rem 0.3rem;
   border: 1px solid transparent;
@@ -715,7 +721,7 @@ footer a:hover { text-decoration: underline; }
   }
   .side-panel.collapsed { bottom: 0; border-bottom: none; }
   .keypad-key {
-    font-size: 1.35rem;
+    font-size: calc(1.35rem * var(--font-nudge));
     padding: 0.45rem 0.55rem;
   }
   .keypad-cat { gap: 4px; padding: 0.3rem 0; }
