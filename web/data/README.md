@@ -51,6 +51,22 @@
 
 代表分類圖示「𑇆」、名稱「筆畫」，第一列是「一」「丨」「丶」三顆按鍵，第二列是「㇒」「丿」「㇀」三顆按鍵，依此類推。`web/keypad.js` 的 `parseKeypad()` 會把這個字串格式轉成 `{ icon, name, rows }` 物件陣列。
 
+### `moe-pua.jsonl` — PUA 補充字 ↔ 教育部異體字字典字號對照表
+
+**不是**從 `legacy/部件檢索.htm` 抽出來的，來源是 WFG 另行發布的《[教育部異體字索引字典](https://fgwang.blogspot.com/2021/12/blog-post_29.html)》離線字典（mdx，本表基於第七版、CreationDate 2025-9-24）。全宋體十萬多個 PUA 補充字中，有 41,521 個是《教育部異體字字典》的字頭，這張表就是它們的字號對照，讓 `web/` 的字詳情面板可以把這些「外部字典查不到」的字直鏈到教育部官網對應頁面。
+
+一行一筆 JSON 陣列，按 PUA 碼位排序：
+
+```
+["<字>", "<字號1>", <官網ID1>, "<字號2>", <官網ID2>, ...]
+```
+
+- `<字>`：PUA 補充字本身（15/16 字面的字是 surrogate pair）。
+- `<字號>`：教育部字號。正字無連字號（如 `N00423`——有 17 個尚未編碼的新增正字）；異體字兩段式（如 `A00414-002`）；附字多為三段式。同一字可兼具多重身份（最多 4 個字號），依 mdx 原順序並列。
+- `<官網ID>`：教育部官網頁面 ID，`https://dict.variants.moe.edu.tw/dictView.jsp?ID=<官網ID>` 可直達該字號的字形資訊頁（URL 格式出自 mdx StyleSheet 樣式 55 的連結模板）。
+
+用 `python3 extract_moe.py <mdx路徑>` 可從 mdx 重新產生（需 `pip install readmdict python-lzo`），已驗證與本檔完全一致。已核對 41,521 個字頭全部存在於 `dt.jsonl`（同一套全宋體 PUA 編碼，零錯位）。這張表只收 PUA 字頭；已正式編碼的字頭官網本來就能以字查詢（`web/app.js` 的 `EXTERNAL_DICTS` 已有連結），不重複收錄。
+
 ## 目前的限制 / 尚未做的事
 
 - `GetBlock()`/`GetIndex()` 那組手刻的 Unicode 區塊偏移量常數，還沒有跟著資料一起抽出來或生成式化（仍是 `AGENTS.md` Phase 4 待辦事項之一），目前是原樣搬進 `web/core.js`。

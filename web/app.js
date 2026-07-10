@@ -1,4 +1,4 @@
-import { loadData } from './data.js';
+import { loadData, loadMoePua } from './data.js';
 import { createMatcher } from './core.js';
 import { parseKeypad } from './keypad.js';
 import { BLOCKS, blockInfo } from './blocks.js';
@@ -420,10 +420,38 @@ function showCharDetail(char, code, info) {
 
   // 外部字典查詢放最頂部(大字下方)，是詳情面板的主要動作
   if (isPua(code)) {
-    const note = document.createElement('p');
-    note.className = 'char-detail-note';
-    note.textContent = '此字尚未正式編碼，目前暫用私有造字區(PUA)碼位，外部字典無法以碼位查詢，故不提供連結。';
-    els.charDetail.appendChild(note);
+    // PUA 補充字外部字典查不到，但其中四萬多字是《教育部異體字字典》的
+    // 字頭(見 web/data/README.md 的 moe-pua.jsonl)，有教育部字號就能直鏈
+    // 官網對應頁面。對照表是懶載入的，先掛佔位容器，載回來再填——填之前
+    // 用 lastDetail 檢查使用者是否已點開別的字，是就直接丟棄這次結果。
+    const holder = document.createElement('div');
+    els.charDetail.appendChild(holder);
+    const detail = lastDetail;
+    loadMoePua().then((moe) => {
+      if (lastDetail !== detail) return;
+      const refs = moe.get(char);
+      const note = document.createElement('p');
+      note.className = 'char-detail-note';
+      if (refs && refs.length) {
+        // 同一字可兼具多重身份(正字/異體/附字各有字號)，逐一列出
+        const links = document.createElement('div');
+        links.className = 'char-detail-links';
+        for (const ref of refs) {
+          const a = document.createElement('a');
+          a.className = 'char-detail-link';
+          a.href = `https://dict.variants.moe.edu.tw/dictView.jsp?ID=${ref.id}`;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.textContent = `教育部異體字字典 ${ref.code}`;
+          links.appendChild(a);
+        }
+        note.textContent = '此字尚未正式編碼，暫用私有造字區(PUA)碼位，一般外部字典查不到；但它是《教育部異體字字典》的字頭，可由字號直達官網：';
+        holder.append(note, links);
+      } else {
+        note.textContent = '此字尚未正式編碼，目前暫用私有造字區(PUA)碼位，外部字典無法以碼位查詢，故不提供連結。';
+        holder.appendChild(note);
+      }
+    });
   } else {
     const links = document.createElement('div');
     links.className = 'char-detail-links';

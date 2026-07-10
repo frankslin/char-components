@@ -22,6 +22,30 @@ async function fetchJson(url) {
   return res.json();
 }
 
+// 教育部異體字字典對照表(moe-pua.jsonl)：PUA 補充字 → [字號, 官網ID, ...]。
+// 只有字詳情面板用得到，而且檔案有 1MB+，所以不跟 loadData() 一起載，
+// 第一次查 PUA 字詳情時才 fetch，之後共用同一個 promise(含失敗——載入失敗
+// 就當作沒有對照資料，不重試不報錯，詳情面板退回「無連結」說明)。
+let moePuaPromise = null;
+
+export function loadMoePua(baseUrl = './data/') {
+  if (!moePuaPromise) {
+    moePuaPromise = fetchLines(`${baseUrl}moe-pua.jsonl`)
+      .then((rows) => {
+        // 每行 [字, 字號1, ID1, 字號2, ID2, ...]，攤平存成 Map
+        const map = new Map();
+        for (const row of rows) {
+          const refs = [];
+          for (let i = 1; i + 1 < row.length; i += 2) refs.push({ code: row[i], id: row[i + 1] });
+          map.set(row[0], refs);
+        }
+        return map;
+      })
+      .catch(() => new Map());
+  }
+  return moePuaPromise;
+}
+
 /**
  * @param {string} baseUrl data/ 目錄的相對或絕對路徑（含結尾斜線）
  * @returns {Promise<{dt: string[], rt: string[], vt: Record<string,string>, kt: string[]}>}
