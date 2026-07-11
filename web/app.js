@@ -413,6 +413,24 @@ async function openDetailForChar(s) {
 // 代替連結。拆字功能統一在這個面板呈現，主查詢區不再有拆字分頁。
 let lastDetail = null;
 
+// 「查異體字」按鈕：以正字號(字號 dash 前的部分)重查——字號查詢本來就會
+// 列出整個字族(正字＋全部異體/附字)，所以只要把正字號塞回輸入框執行查詢。
+// 同一字兼具多重身份、掛在多個字族下時，每個字族一顆按鈕(標籤帶字號區分)。
+function moeFamilyButtons(refs) {
+  const fams = [...new Set(refs.map((r) => r.code.split('-')[0]))];
+  return fams.map((code) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'char-detail-link char-detail-action';
+    btn.textContent = fams.length > 1 ? `查異體字 ${code}` : '查異體字';
+    btn.addEventListener('click', () => {
+      els.input.value = code;
+      runSearch();
+    });
+    return btn;
+  });
+}
+
 // 教育部異體字字典的字號直鏈(dictView 的 ID 出自對照表，直達該字號頁面)
 function moeRefLink(ref) {
   const a = document.createElement('a');
@@ -480,6 +498,7 @@ function showCharDetail(char, code, info) {
         const links = document.createElement('div');
         links.className = 'char-detail-links';
         for (const ref of refs) links.appendChild(moeRefLink(ref));
+        links.append(...moeFamilyButtons(refs));
         note.textContent = '此字尚未正式編碼，暫用私有造字區(PUA)碼位，一般外部字典查不到；但它是《教育部異體字字典》的字頭，可由字號直達官網：';
         holder.append(note, links);
       } else {
@@ -506,7 +525,7 @@ function showCharDetail(char, code, info) {
     // 比搜尋更精準(搜尋同形字可能命中多筆或失敗)；查不到就維持原連結
     getMoeRefs(char).then((refs) => {
       if (lastDetail !== detail || !refs) return;
-      moeAnchor.replaceWith(...refs.map(moeRefLink));
+      moeAnchor.replaceWith(...refs.map(moeRefLink), ...moeFamilyButtons(refs));
     });
   }
 

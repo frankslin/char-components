@@ -517,23 +517,34 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   font-size: 12px;
 }
 
-/* 側欄頂端「部件鍵盤／字詳情」小頁籤，切換 #side-panel 的 data-view。
-   點字詳情時樣式沿用主分頁 .tab 的邏輯但縮小尺寸，維持視覺語言一致。 */
-.side-panel-tabs { display: flex; gap: 0.2rem; }
+/* 側欄頂端「部件鍵盤／字詳情」頁籤，切換 #side-panel 的 data-view。
+   做成分段控件(segmented control)：選中的用主色填充(視覺語言同
+   .btn-primary)，未選中的維持完整可點按外觀——曾經是 12px 的灰字幽靈
+   按鈕，看起來像說明文字，尤其手機上點開字詳情後使用者發現不了還能切回
+   部件鍵盤(帶 ?q=U+…/字號 的分享連結一進來就是字詳情視圖，更嚴重)。 */
+.side-panel-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+}
 
 .side-tab {
   appearance: none;
-  border: 1px solid transparent;
+  border: none;
   background: none;
-  border-radius: 5px;
-  padding: 0.15rem 0.55rem;
-  font-size: 12px;
+  border-radius: 6px;
+  padding: 0.3rem 0.85rem;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--muted);
+  color: var(--fg);
+  cursor: pointer;
 }
 
-.side-tab:hover { color: var(--fg); background: var(--bg-subtle); }
-.side-tab.active { color: var(--fg); background: var(--bg-subtle); border-color: var(--border); }
+.side-tab:hover { background: var(--bg); }
+.side-tab.active { background: var(--accent); color: #fff; font-weight: 600; }
 
 /* 鍵盤／字詳情共用同一個可捲動容器，用 data-view 切換顯示哪一個，
    避免兩份各自的 overflow-y 邏輯要重複維護。 */
@@ -623,6 +634,20 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 
 .char-detail-link:hover { background: var(--accent); color: #fff; }
+
+/* 「查異體字」是站內動作(以正字號重查整個字族)，主色填充，
+   跟外部字典的外框連結做視覺區隔 */
+.char-detail-action {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.char-detail-action:hover { filter: brightness(1.08); }
 
 .keypad-cat {
   display: flex;
@@ -727,6 +752,16 @@ footer a:hover { text-decoration: underline; }
     z-index: 5;
   }
   .side-panel.collapsed { bottom: 0; border-bottom: none; }
+  /* 手機上頁籤撐滿抽屜頂部、加大到近 44px 觸控目標——抽屜矮、內容擠，
+     頁籤不夠大就會被當成裝飾看不見 */
+  .side-panel-header { gap: 0.5rem; }
+  .side-panel-tabs { flex: 1 1 auto; }
+  .side-tab {
+    flex: 1 1 0;
+    padding: 0.6rem 0.5rem;
+    font-size: 15px;
+    text-align: center;
+  }
   .keypad-key {
     font-size: calc(1.35rem * var(--font-nudge));
     padding: 0.45rem 0.55rem;
