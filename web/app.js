@@ -1,5 +1,4 @@
-import { loadData, getMoeRefs, findMoeCode } from './data.js';
-import { createMatcher } from './core.js';
+import { getMoeRefs, findMoeCode } from './data.js';
 import { parseKeypad } from './keypad.js';
 import { BLOCKS, blockInfo } from './blocks.js';
 import { RADICAL_ENTRIES } from './radicals.js';
@@ -9,6 +8,37 @@ const FULL_MAX_RESULTS = 3000;
 const LIVE_DEBOUNCE_MS = 120;
 const RENDER_WAVE_SIZE = 240;
 const RENDER_WAVE_MAX_WAIT_MS = 1000;
+
+// 比對計算在 worker.js(Web Worker)裡跑，主執行緒不再被同步比對凍住(同字
+// 異拆開啟時單次 ~700ms，過去每次即時查詢都卡一下打字)。這裡是 RPC 客戶端：
+// 每個請求帶遞增 id，以 Promise 對應回覆。matcher 與 dt 資料只存在 worker
+// 側，主執行緒只拿渲染所需的純資料(hits/trees/block)。
+const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+const rpcPending = new Map();
+let rpcSeq = 0;
+
+function rpc(op, args) {
+  return new Promise((resolve, reject) => {
+    const id = ++rpcSeq;
+    rpcPending.set(id, { resolve, reject });
+    worker.postMessage({ id, op, ...args });
+  });
+}
+
+worker.addEventListener('message', (e) => {
+  const { id, ok, result, error } = e.data;
+  const p = rpcPending.get(id);
+  if (!p) return;
+  rpcPending.delete(id);
+  if (ok) p.resolve(result);
+  else p.reject(new Error(error));
+});
+
+// worker 腳本本身載入失敗(404/語法錯誤)不會走 message，一律讓在途請求失敗
+worker.addEventListener('error', (e) => {
+  for (const p of rpcPending.values()) p.reject(new Error(e.message || 'worker 載入失敗'));
+  rpcPending.clear();
+});
 
 // 外部字典：字詳情面板會把全部連結一次列出(PUA 補充字除外——沒有正式碼位，
 // 外部字典查不到)。字統網是 legacy 版預設的 `ref`；其餘 URL 格式都驗證過
@@ -370,11 +400,11 @@ function buildSplitTree(char, text) {
 // 由字元直接打開字詳情(「\字」語法、舊版 ?mode=tree 連結用)。
 // core.js 的 code 編碼對 BMP 是 charCode、對輔助平面等於真實 code point
 // (推導見 doc/04)，所以直接用 codePointAt 即可。
-function openDetailForChar(s) {
+async function openDetailForChar(s) {
   const cp = s.codePointAt(0);
   if (cp === undefined) return;
-  const char = String.fromCodePoint(cp);
-  showCharDetail(char, cp, blockInfo(matcher.getBlock(cp)));
+  const { block } = await rpc('codepoint', { cp });
+  showCharDetail(String.fromCodePoint(cp), cp, blockInfo(block));
 }
 
 // 字詳情：點一個字後，右側面板**一次列出**全部資訊，不需要再點按鈕展開——
@@ -482,10 +512,13 @@ function showCharDetail(char, code, info) {
 
   // 拆分樹：尊重「同字異拆」選項(對應 AGENTS.md 黃金案例的 \主 行為)——
   // 未勾選只畫第一種拆法，但提示還有幾種；勾選則全部左右並排。
+  // 拆分資料在 worker 側，非同步取回；比照上面 moe 對照的模式，回來後用
+  // lastDetail 檢查使用者是否已點開別的字，是就直接丟棄這次結果。
   const d = els.subdivide.checked;
-  const all = matcher.getTree(char, true);
-  const trees = d ? all : all.slice(0, 1);
-  if (trees.length) {
+  rpc('tree', { char }).then(({ trees: all }) => {
+    if (lastDetail !== detail) return;
+    const trees = d ? all : all.slice(0, 1);
+    if (!trees.length) return;
     const label = document.createElement('div');
     label.className = 'char-detail-label';
     label.textContent = all.length > 1 ? `拆分（${all.length} 種拆法）` : '拆分';
@@ -500,7 +533,7 @@ function showCharDetail(char, code, info) {
       note.textContent = `另有 ${all.length - 1} 種拆法，勾選「同字異拆」可全部顯示。`;
       els.charDetail.appendChild(note);
     }
-  }
+  });
 }
 
 // 即時 tooltip：原生 title 有內建約一秒的顯示延遲且無法調整，改用事件委託
@@ -580,8 +613,6 @@ function buildKeypad(categories) {
   els.keypadGrid.appendChild(frag);
 }
 
-let matcher;
-let dtData; // 碼位查詢需要直接查 dt 字頭驗證「已收錄」，main() 載入後賦值
 let composing = false;
 let liveTimer;
 let searchToken = 0;
@@ -601,14 +632,10 @@ function doSearch(max, { settle = false, sync = true } = {}) {
     clearOutput();
     return;
   }
-  // 比對是同步計算、會佔住主執行緒，直接跑的話 spinner 根本畫不出來。
-  // 先顯示「檢索中」，等瀏覽器畫完這一幀(rAF + setTimeout)再開始算；
-  // token 用來作廢已排程但過期的檢索(使用者又打了字/清除/回退)。
+  // 比對在 worker 執行緒跑(見頂部的 rpc)，主執行緒不會被凍住，spinner
+  // 能正常轉；token 用來作廢過期的檢索回覆(使用者又打了字/清除/回退)。
   showBusy(els.counter, '檢索中…');
-  requestAnimationFrame(() => setTimeout(() => {
-    if (token !== searchToken) return;
-    runMatch(raw, max);
-  }, 0));
+  runMatch(raw, max, token);
 }
 
 // 「檢索碼位」：整個輸入若是碼位寫法——U+4E00 / u+f0200 / 0x4E00 帶前綴，
@@ -631,18 +658,18 @@ function parseCodepointQuery(raw) {
 // 「已收錄」的判定：getIndex() 能換算出下標，且該 dt 條目的字頭就是這個字。
 // 下標 1~10 是 A~J 旗標的保留列，不是真的字，排除；11~48 的保留列是鍵盤
 // 部件(⺀、㇀ 之類)，屬於可查詢的合法目標。
-function renderCodepointResult(cp, raw, jump) {
+async function renderCodepointResult(cp, token, jump) {
   const label = `U+${cp.toString(16).toUpperCase().padStart(4, '0')}`;
-  const i = matcher.getIndex(cp);
-  const known = i > 10 && dtData[i] !== undefined && dtData[i].codePointAt(0) === cp;
+  const { known, block } = await rpc('codepoint', { cp });
+  if (token !== searchToken) return;
   if (!known) {
     clearOutput();
     els.counter.textContent = `碼位 ${label} 不在收錄範圍`;
     return;
   }
   const char = String.fromCodePoint(cp);
-  const info = blockInfo(matcher.getBlock(cp));
-  renderHits([{ char, code: cp, hit: 0, block: matcher.getBlock(cp) }], false);
+  const info = blockInfo(block);
+  renderHits([{ char, code: cp, hit: 0, block }], false);
   els.counter.textContent = info.cls === 'sup'
     ? `碼位 ${label} → 「${char}」（補充字，暫用私有碼位）`
     : `碼位 ${label} → 「${char}」（${info.label}）`;
@@ -676,52 +703,50 @@ async function renderMoeCodeResult(code, token, jump) {
   // 點開詳情時正向表本來就會列出該字的全部字號
   const seen = new Set();
   const list = (isZheng ? res.family : [res.exact]).filter(({ char }) => !seen.has(char) && seen.add(char));
-  renderHits(list.map(({ char }) => {
-    const cp = char.codePointAt(0);
-    return { char, code: cp, hit: 0, block: matcher.getBlock(cp) };
-  }), false);
+  const cps = list.map(({ char }) => char.codePointAt(0));
+  const { blocks } = await rpc('blocks', { cps });
+  if (token !== searchToken) return;
+  renderHits(list.map(({ char }, idx) => ({ char, code: cps[idx], hit: 0, block: blocks[idx] })), false);
   const zhengChar = list[0].char;
   els.counter.textContent = isZheng
     ? `字號 ${code} → 「${zhengChar}」字族共 ${list.length} 字`
     : `字號 ${code} → 「${res.exact.char}」`;
-  if (jump) {
-    const ch = isZheng ? zhengChar : res.exact.char;
-    const cp = ch.codePointAt(0);
-    showCharDetail(ch, cp, blockInfo(matcher.getBlock(cp)));
-  }
+  // 裸正字號跳正字的詳情、帶後綴跳該字——兩種情況都是 list[0]
+  if (jump) showCharDetail(zhengChar, cps[0], blockInfo(blocks[0]));
 }
 
-function runMatch(raw, max) {
+async function runMatch(raw, max, token) {
   const cp = parseCodepointQuery(raw);
   if (cp !== null) {
-    renderCodepointResult(cp, raw, max >= FULL_MAX_RESULTS);
+    renderCodepointResult(cp, token, max >= FULL_MAX_RESULTS);
     return;
   }
   const moeCode = parseMoeCodeQuery(raw);
   if (moeCode !== null) {
-    renderMoeCodeResult(moeCode, searchToken, max >= FULL_MAX_RESULTS);
+    renderMoeCodeResult(moeCode, token, max >= FULL_MAX_RESULTS);
     return;
   }
   const d = els.subdivide.checked;
-  const start = performance.now();
   const v = els.variant.checked;
   const u = els.ucodeOnly.checked;
   const query = hasBlockFlag(raw) ? raw : DEFAULT_FLAGS + raw;
-  const hits = matcher.getMatch(query, v, d, u, max);
+  // elapsed 由 worker 量測，只含純比對時間，與原本主執行緒同步計算的口徑一致
+  const { hits, elapsed } = await rpc('match', { query, v, d, u, max });
+  if (token !== searchToken) return;
   // 精確命中排到最前面(如「木木」的「林」)；其餘維持拆分表原順序。
   // 這是 UI 層的顯示排序，不動 core.js 的比對結果本身。
   const ordered = [...hits.filter((h) => h.hit === 0), ...hits.filter((h) => h.hit !== 0)];
   const truncated = ordered.length > max;
   const shown = truncated ? ordered.filter((h, i) => h.hit === 0 || i < max) : ordered;
   renderHits(shown, truncated);
-  const elapsed = ((performance.now() - start) / 1000).toFixed(3);
+  const secs = (elapsed / 1000).toFixed(3);
   // core.js getMatch() 沿用 legacy 的 `out.length <= m` 哨兵設計：模糊命中
   // 最多收到 m+1 條，多出的一條只用來偵測「超過上限」。所以截斷時不能把
   // hits.length 當總數顯示(那只是被截斷的列表長度，恆為 501 之類)，要照
   // legacy 顯示「超過 m 字」。
   els.counter.textContent = truncated
-    ? `「${raw}」超過 ${max} 字（${elapsed} 秒）`
-    : `「${raw}」總計 ${hits.length} 字（${elapsed} 秒）`;
+    ? `「${raw}」超過 ${max} 字（${secs} 秒）`
+    : `「${raw}」總計 ${hits.length} 字（${secs} 秒）`;
 }
 
 function runSearch() {
@@ -862,18 +887,16 @@ async function main() {
   buildLegend();
   setupTooltip();
   showBusy(els.status, '資料載入中（約 4MB，第一次開啟需要一點時間）…');
-  const t0 = performance.now();
   try {
-    const { dt, rt, vt, kt } = await loadData('./data/');
-    matcher = createMatcher(dt, rt, vt);
-    dtData = dt;
+    // 資料載入與 matcher 建立都在 worker 側(見 worker.js)，這裡只拿
+    // 鍵盤佈局(kt)與載入耗時回來
+    const { kt, ms } = await rpc('init');
     buildKeypad(parseKeypad(kt));
+    els.status.textContent = `資料載入完成（${ms} ms）`;
   } catch (err) {
     els.status.textContent = `資料載入失敗：${err.message}`;
     return;
   }
-  const ms = (performance.now() - t0).toFixed(0);
-  els.status.textContent = `資料載入完成（${ms} ms）`;
 
   els.search.addEventListener('click', runSearch);
   // 選項變更立即反映到網址(replace)並重跑即時查詢；
