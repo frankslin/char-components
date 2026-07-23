@@ -67,6 +67,46 @@ def align_pua_rows(dt, rt):
     return True
 
 
+# 全宋體「無字形」的碼位：dt 的算術區塊被補齊到區塊邊界時多納入的未指派碼位
+# （各擴充區尾端 padding、相容區未指派格）＋ PUA 補充字塊開頭的保留槽。這些列在
+# legacy 裡都是 `字@╳`（無拆分、也沒被任何字當部件引用），字型畫不出來，卻會被
+# getMatch() 當結果丟出（例如搜 U+3347A 會回 6 個一模一樣的空框——3347A 本身＋5 個
+# 重複佔位列）。抹成空字串後，core.js 的 `if (!dt[i]) continue;` 會跳過它們，非字元
+# 就不再被搜出。範圍由 deps/fonts 的全宋體 cmap 與 dt 逐碼位比對得出（版本綁定，字型
+# 或資料改版時以下列一行重算：
+#   python3 -c "from fontTools.ttLib import TTFont;import glob,json;cov=set().union(*(set(TTFont(p).getBestCmap()) for p in glob.glob('deps/fonts/FSung-*.ttf')));dt=[json.loads(l) for l in open('web/data/dt.jsonl')];print(sorted({ord(dt[i][0]) for i in range(49,len(dt)) if dt[i] and ord(dt[i][0]) not in cov}))"
+NONCHAR_RANGES = [
+    (0xFA6E, 0xFA6F),    # 相容表意 區塊內未指派
+    (0x2B81E, 0x2B81F),  # Ext-D 尾 padding
+    (0x2CEAE, 0x2CEAF),  # Ext-E 尾 padding
+    (0x2EBE1, 0x2EBEF),  # Ext-F 尾 padding
+    (0x2EE5E, 0x2EE5F),  # Ext-I 尾 padding
+    (0x2FA1E, 0x2FA1F),  # 相容補充 尾 padding
+    (0x3134B, 0x3134F),  # Ext-G 尾 padding
+    (0x3347A, 0x3347A),  # Ext-J 尾（此碼位在 legacy 佔了 6 列：本尊＋5 個重複佔位）
+    (0xF0200, 0xF021F),  # PUA 補充字塊開頭的保留槽（補充字實際從更後面才開始）
+]
+
+
+def blank_noncharacter_rows(dt, rt):
+    """把「全宋體無字形」的佔位列抹成空字串，讓 core.js 不再把非字元搜成空框。
+
+    只動 i>=49（保留列 0..48 另有語意）、且內嵌碼位落在 NONCHAR_RANGES 的列；
+    這些列一律是 `字@╳`（無拆分、未被當部件），抹除不影響任何真字。`rt` 同列同抹。
+    冪等：已是空字串就不重複處理。詳見本目錄 README。
+    """
+    def is_nonchar(c):
+        return any(lo <= c <= hi for lo, hi in NONCHAR_RANGES)
+    n = 0
+    for i in range(49, len(dt)):
+        e = dt[i]
+        if e and is_nonchar(ord(e[0])):
+            dt[i] = ""
+            rt[i] = ""
+            n += 1
+    return n
+
+
 def main():
     html = HTM_PATH.read_text(encoding="utf-8-sig")
     marker = "客製化修改區結束"
@@ -89,6 +129,9 @@ def main():
 
     if align_pua_rows(dt, rt):
         print("aligned PUA rows U+F7121-F712F (see README)", file=sys.stderr)
+    blanked = blank_noncharacter_rows(dt, rt)
+    if blanked:
+        print(f"blanked {blanked} non-character placeholder rows (see README)", file=sys.stderr)
 
     dt_path = OUT_DIR / "dt.jsonl"
     with dt_path.open("w", encoding="utf-8") as f:

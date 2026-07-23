@@ -162,7 +162,7 @@ export function createMatcher(dt, rt, vt) {
         const m = a.indexOf(variant(ch, v));
         if (m < 0) {
           const idx = getIndex(c);
-          if (idx) n += eliminate(a, dt[idx].slice(j + 1), d, v);
+          if (idx && dt[idx]) n += eliminate(a, dt[idx].slice(j + 1), d, v);
           else n++;
         } else {
           a.splice(m, 1);
@@ -212,6 +212,7 @@ export function createMatcher(dt, rt, vt) {
     const e = l - 48;
     for (let ii = 1; ii < l; ii++) {
       const i = ii < e ? ii + 48 : ii - l + 49;
+      if (!dt[i]) continue; // 空列＝已抹除的非字元佔位（無字形碼位），不進結果
       const y = x.concat();
       let j = 0;
       let w = dt[i].charAt(j);
@@ -253,7 +254,7 @@ export function createMatcher(dt, rt, vt) {
       // 自己身上直接堆疊溢位(legacy 版對拆分資料為佔位符的字同樣會當掉，
       // 是少數刻意偏離逐字翻譯的修正)；eliminate() 對應的防護是 `if (idx)`。
       const idx = getIndex(c);
-      const p = idx ? dt[idx].slice(j + 1) : '';
+      const p = idx && dt[idx] ? dt[idx].slice(j + 1) : '';
       let k = 0;
       for (let i = 0; i < p.length; i++) {
         w = p.charAt(i);
