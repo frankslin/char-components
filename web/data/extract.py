@@ -43,6 +43,30 @@ def extract_literal(text, var_name):
     return value
 
 
+def align_pua_rows(dt, rt):
+    """修正全宋體補充字塊 U+F7121–F712F 這 15 列在 legacy 裡的錯序。
+
+    legacy 把「糹殿」(U+F7121) 的條目排在該視窗的最後一列(算術位置 U+F712F),
+    其餘 14 字各往後移一格,使純算術的 `getIndex()`(id = 碼位 - 0xD6F55)查這 15
+    個補充字時取到「隔壁列」,拆分樹/字詳情會顯示成後一個碼位的字。這裡按內嵌碼位
+    升序把這段重排,讓「列序 == 內嵌碼位 == 全宋體字形」三者一致;`rt` 逐行對齊,
+    套用相同排列。char↔拆分 的綁定本身不變,只更正列序。詳見本目錄 README。
+
+    冪等:若已對齊(或上游日後在來源就修好),直接跳過不動。
+    """
+    PUA_OFF = 0xD6F55
+    lo, hi = 0xF7121 - PUA_OFF, 0xF712F - PUA_OFF  # -> 0-indexed 列 131532..131546
+    win = list(range(lo, hi + 1))
+    if all(ord(dt[i][0]) == i + PUA_OFF for i in win):
+        return False
+    order = sorted(win, key=lambda i: ord(dt[i][0]))
+    dt_win = [dt[i] for i in order]
+    rt_win = [rt[i] for i in order]
+    for pos, dv, rv in zip(win, dt_win, rt_win):
+        dt[pos], rt[pos] = dv, rv
+    return True
+
+
 def main():
     html = HTM_PATH.read_text(encoding="utf-8-sig")
     marker = "客製化修改區結束"
@@ -62,6 +86,9 @@ def main():
 
     if len(dt) != len(rt):
         raise SystemExit(f"dt ({len(dt)}) and rt ({len(rt)}) length mismatch")
+
+    if align_pua_rows(dt, rt):
+        print("aligned PUA rows U+F7121-F712F (see README)", file=sys.stderr)
 
     dt_path = OUT_DIR / "dt.jsonl"
     with dt_path.open("w", encoding="utf-8") as f:
