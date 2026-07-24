@@ -22,6 +22,7 @@ import logging
 import shutil
 import sys
 from collections import defaultdict
+from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
 from fontTools import subset as ft_subset
@@ -107,9 +108,36 @@ def subset_chunk(blob, codepoints):
     subsetter = ft_subset.Subsetter(options=options)
     subsetter.populate(unicodes=sorted(codepoints))
     subsetter.subset(font)
+    # options.flavor 只是 Subsetter 的設定欄位，唯有 ft_subset 自己的 CLI 路徑
+    # (save_font()) 會把它套到 TTFont 上；這裡是直接呼叫 font.save()，所以必須
+    # 自己指定 flavor，否則存出來的是「副檔名叫 .woff2 的裸 TTF」——瀏覽器靠
+    # magic bytes 嗅探仍能顯示，不會報錯，但體積會是真 woff2 的兩倍多。
+    font.flavor = "woff2"
     buf = io.BytesIO()
     font.save(buf)
-    return buf.getvalue()
+    data = buf.getvalue()
+    if data[:4] != b"wOF2":
+        raise SystemExit(
+            f"Expected WOFF2 output, got magic {data[:4]!r} -- font.flavor was not applied."
+        )
+    return data
+
+
+_WORKER_BLOBS = {}
+
+
+def _worker_init():
+    """每個 worker 各讀一份來源 TTF(合計約 200MB)，避免逐個分片重複 I/O。"""
+    for name in PRIORITY:
+        _WORKER_BLOBS[name] = (SRC_DIR / f"{name}.ttf").read_bytes()
+
+
+def _build_one(task):
+    chunk_start, font, cps = task
+    filename = f"{PREFIX}-{WEIGHT}-{chunk_start:06x}.woff2"
+    data = subset_chunk(_WORKER_BLOBS[font], cps)
+    (FONTS_DIR / filename).write_bytes(data)
+    return filename, len(data)
 
 
 def main():
@@ -121,14 +149,20 @@ def main():
     assignment = assign_chunks(cmaps)
     print(f"  {len(assignment)} chunks total", file=sys.stderr)
 
-    css_rules = []
     items = sorted(assignment.items(), key=lambda kv: kv[0][0])
-    for i, ((chunk_start, font), cps) in enumerate(items, 1):
-        filename = f"{PREFIX}-{WEIGHT}-{chunk_start:06x}.woff2"
-        out_path = FONTS_DIR / filename
-        data = subset_chunk(blobs[font], cps)
-        out_path.write_bytes(data)
+    tasks = [(chunk_start, font, sorted(cps)) for (chunk_start, font), cps in items]
+    del blobs  # 每個 worker 自己重讀一份，別靠 fork 繼承(macOS 預設是 spawn)
 
+    css_rules = []
+    total_bytes = 0
+    with Pool(processes=max(1, cpu_count() - 2), initializer=_worker_init) as pool:
+        for i, (filename, size) in enumerate(pool.imap(_build_one, tasks), 1):
+            total_bytes += size
+            if i % 50 == 0 or i == len(tasks):
+                print(f"  {i}/{len(tasks)} chunks built ({filename}, {size} bytes)", file=sys.stderr)
+
+    for (chunk_start, font), cps in items:
+        filename = f"{PREFIX}-{WEIGHT}-{chunk_start:06x}.woff2"
         lo = chunk_start
         hi = chunk_start + CHUNK_SIZE - 1
         css_rules.append(
@@ -141,8 +175,7 @@ def main():
             f"  unicode-range: U+{lo:04X}-{hi:04X};\n"
             "}"
         )
-        if i % 50 == 0 or i == len(items):
-            print(f"  {i}/{len(items)} chunks built ({filename}, {len(data)} bytes)", file=sys.stderr)
+    print(f"  {total_bytes / 1e6:.1f} MB of woff2 written", file=sys.stderr)
 
     header = (
         "/* WFG FSung Webfonts\n"

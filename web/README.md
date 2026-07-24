@@ -16,7 +16,7 @@ web/
 └── app.js       DOM 組裝：查詢輸入、即時搜尋、部件鍵盤、字詳情(含拆分樹渲染)、字源圖例、結果渲染、複製到剪貼簿
 ```
 
-`web/` 本身沒有任何外部執行期相依（不用 CDN、不用第三方服務）——`data/` 和 `webfonts/` 都是 vendored 進來的副本，整個 `web/` 目錄複製到任何靜態空間都能直接跑。`webfonts/wfg-fsung/` 跟 repo 根目錄的 `webfonts/wfg-fsung/`（那份是給 `wfg-fsung-webfonts` npm 套件用的）內容一致，由 `webfonts/build-wfg-fsung.py` 的 `sync_vendor_copy()` 自動同步；曾經改成指向 unpkg CDN 省掉這份 163MB 的重複，但 CDN 代理 npm registry 的延遲不穩定，改回本機同源字型。
+`web/` 本身沒有任何外部執行期相依（不用 CDN、不用第三方服務）——`data/` 和 `webfonts/` 都是 vendored 進來的副本，整個 `web/` 目錄複製到任何靜態空間都能直接跑。`webfonts/wfg-fsung/` 跟 repo 根目錄的 `webfonts/wfg-fsung/`（那份是給 `wfg-fsung-webfonts` npm 套件用的）內容一致，由 `webfonts/build-wfg-fsung.py` 的 `sync_vendor_copy()` 自動同步；曾經改成指向 unpkg CDN 省掉這份約 80MB 的重複，但 CDN 代理 npm registry 的延遲不穩定，改回本機同源字型。
 
 ## 為什麼不能用 `file://` 雙擊開啟
 

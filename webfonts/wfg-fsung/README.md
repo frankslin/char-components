@@ -27,14 +27,10 @@ WFG「全宋體」是作者無條件分享給**學術研究、教育工作、個
 
 ### 使用方式
 
-```html
-<link rel="stylesheet" href="./wfg-fsung.css">
-```
-
-發布到 npm 後也可以從 unpkg 載入：
+推薦從 jsDelivr 載入（免安裝，一行即可）：
 
 ```html
-<link rel="stylesheet" href="https://unpkg.com/wfg-fsung-webfonts@1.0.1/wfg-fsung.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/wfg-fsung-webfonts@1.1.0/wfg-fsung.css">
 ```
 
 ```css
@@ -43,9 +39,17 @@ body {
 }
 ```
 
-注意：jsDelivr 的 npm 模式有 150MB **整包**大小上限——本包帶齊全部碼位切片
-（合計約 163MB），jsDelivr 會對包內**每個**檔案回 403，不只是超大的那幾個。
-unpkg 沒有這個限制、可正常服務，請改用 unpkg。
+CSS 裡的分片路徑是相對的，瀏覽器會自動接到同一個 CDN 前綴底下，例如
+`https://cdn.jsdelivr.net/npm/wfg-fsung-webfonts@1.1.0/fonts/WFGFSung-400-004e00.woff2`，
+不需要另外設定。建議像上面一樣鎖定完整版號（快取命中率最高）；想跟著小版本更新可寫
+`@1`，jsDelivr 會解析成最新的 1.x。unpkg 也可以，路徑同構：
+`https://unpkg.com/wfg-fsung-webfonts@1.1.0/wfg-fsung.css`。
+
+從 npm 安裝或直接複製整包時則是：
+
+```html
+<link rel="stylesheet" href="./wfg-fsung.css">
+```
 
 CSS 以 256 碼位為一片的 `unicode-range` 切片（與 `jigmo-webfonts` 等 CJK
 網頁字型專案相同的慣例），瀏覽器只會下載頁面實際用到的區塊。
@@ -97,14 +101,10 @@ See [`LICENSE`](./LICENSE) for the full terms.
 
 ### Usage
 
-```html
-<link rel="stylesheet" href="./wfg-fsung.css">
-```
-
-Once published to npm, it can also be loaded from unpkg:
+The recommended way is a single line from jsDelivr — no install needed:
 
 ```html
-<link rel="stylesheet" href="https://unpkg.com/wfg-fsung-webfonts@1.0.1/wfg-fsung.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/wfg-fsung-webfonts@1.1.0/wfg-fsung.css">
 ```
 
 ```css
@@ -113,10 +113,18 @@ body {
 }
 ```
 
-Note: jsDelivr's npm mode enforces a 150MB *total package* size limit — since this
-package bundles every codepoint chunk (~163MB combined), jsDelivr rejects every file
-in it with 403, not just the oversized ones. unpkg has no such limit and serves the
-package correctly, so use unpkg instead.
+The chunk URLs inside the CSS are relative, so browsers resolve them under the same CDN
+prefix automatically, e.g.
+`https://cdn.jsdelivr.net/npm/wfg-fsung-webfonts@1.1.0/fonts/WFGFSung-400-004e00.woff2`
+— nothing else to configure. Pinning the full version as above gives the best cache hit
+rate; use `@1` if you want jsDelivr to resolve the latest 1.x instead. unpkg works too,
+with the same path layout: `https://unpkg.com/wfg-fsung-webfonts@1.1.0/wfg-fsung.css`.
+
+When installing from npm or vendoring the package directly:
+
+```html
+<link rel="stylesheet" href="./wfg-fsung.css">
+```
 
 The CSS uses 256-codepoint `unicode-range` chunks (the same convention used by
 CJK webfont projects like `jigmo-webfonts`), so browsers only download the

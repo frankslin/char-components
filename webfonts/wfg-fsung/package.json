@@ -1,6 +1,6 @@
 {
   "name": "wfg-fsung-webfonts",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Chunked woff2 webfonts for WFG「全宋體」(FSung), the private-use-area supplemented Song-style font behind 部件檢索. Non-commercial use only -- see LICENSE.",
   "license": "LicenseRef-WFG-NonCommercial",
   "main": "wfg-fsung.css",
@@ -16,6 +16,10 @@
     "type": "git",
     "url": "git+https://github.com/frankslin/char-components.git",
     "directory": "webfonts/wfg-fsung"
+  },
+  "homepage": "https://github.com/frankslin/char-components/tree/main/webfonts/wfg-fsung#readme",
+  "bugs": {
+    "url": "https://github.com/frankslin/char-components/issues"
   },
   "keywords": [
     "font",

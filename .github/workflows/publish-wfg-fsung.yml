@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          registry-url: https://registry.npmjs.org
+          # 不設 NODE_AUTH_TOKEN：認證走 OIDC，token 由 npm CLI 自己換取
 
       # OIDC 需要 npm >= 11.5.1，Node 24 自帶的即滿足；不要 npm install -g
       # npm@latest 自我升級——會把自身裝壞(丟失 sigstore 等內建依賴)
@@ -35,5 +37,35 @@ jobs:
             echo "::error::$PKG@$VER 已存在於 npm，請先 bump 版本"
             exit 1
           fi
+
+      # 1.0.x 曾把未壓縮的裸 TTF 當成 .woff2 發出去(build 腳本漏設 font.flavor)，
+      # 整包 169MB 超過 jsDelivr 的 150MB 上限、被整包 403。這裡擋住同樣的意外。
+      - name: Verify chunks are real woff2 and package fits jsDelivr
+        run: |
+          node -e '
+            const fs = require("fs");
+            const bad = fs.readdirSync("fonts").filter(f => {
+              const fd = fs.openSync("fonts/" + f, "r");
+              const buf = Buffer.alloc(4);
+              fs.readSync(fd, buf, 0, 4, 0);
+              fs.closeSync(fd);
+              return buf.toString("latin1") !== "wOF2";
+            });
+            if (bad.length) {
+              console.log(`::error::${bad.length} 個分片不是 woff2，例如 ${bad.slice(0, 3).join(", ")}`);
+              process.exit(1);
+            }
+            console.log(`${fs.readdirSync("fonts").length} chunks verified as woff2`);
+          '
+          npm pack --dry-run --json > /tmp/pack.json
+          node -e '
+            const { unpackedSize, entryCount } = require("/tmp/pack.json")[0];
+            const mb = unpackedSize / 1e6;
+            console.log(`package: ${entryCount} files, ${mb.toFixed(1)} MB unpacked`);
+            if (mb > 150) {
+              console.log("::error::超過 jsDelivr npm 模式的 150MB 整包上限");
+              process.exit(1);
+            }
+          '
 
       - run: npm publish --provenance
