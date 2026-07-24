@@ -137,8 +137,15 @@ function stateToParams() {
   if (!els.variant.checked) p.set('v', '0');
   if (!els.subdivide.checked) p.set('d', '0');
   if (els.ucodeOnly.checked) p.set('u', '1');
+  // 「正在看哪個字」也寫進網址(c=聚焦的字)：查到一堆字後點某個字塊看詳情，
+  // 分享出去的連結要能同時帶著「怎麼查的」(q)與「在看哪個」(c)。只在「用
+  // 部件查一堆字、再點其中一個」時才設；碼位/字號查詢本身就指明了字，不重複帶。
+  if (focusedChar) p.set('c', focusedChar);
   return p;
 }
+
+// 目前在字詳情裡聚焦的字(對應網址的 c 參數)。null = 沒有聚焦(結果列表視圖)。
+let focusedChar = null;
 
 // 歷史棧策略：把「按查詢/Enter 確認過的查詢」與「由連結開啟/前後退還原的狀態」
 // 視為已定案(settled)的歷史紀錄。之後第一次變更(打字、勾選項、切分頁)會先
@@ -162,13 +169,25 @@ function applyStateFromUrl() {
   els.subdivide.checked = p.get('d') !== '0';
   els.ucodeOnly.checked = p.get('u') === '1';
   const q = p.get('q') ?? '';
+  const c = p.get('c');
   els.input.value = q;
   clearTimeout(liveTimer);
   urlSettled = true;
   if (q) {
-    doSearch(FULL_MAX_RESULTS, { sync: false });
-    // 舊版分享連結的 ?mode=tree(拆字分頁)：拆字已統一併入字詳情面板
-    if (p.get('mode') === 'tree') openDetailForChar(q);
+    doSearch(FULL_MAX_RESULTS, { sync: false }); // 會清掉 focusedChar
+    // 分享連結帶 c=聚焦的字：查詢跑完後把那個字的詳情打開(openDetailForChar
+    // 自己查碼位/字源，不必等結果列表)。舊版 ?mode=tree 是同樣意思的相容寫法。
+    if (c) {
+      focusedChar = c;
+      openDetailForChar(c);
+    } else if (p.get('mode') === 'tree') {
+      openDetailForChar(q);
+    } else if (parseCodepointQuery(q) === null && parseMoeCodeQuery(q) === null) {
+      // 一般部件查詢、且網址沒指定聚焦的字＝結果列表視圖。用「上一頁」從某個
+      // 字的詳情退回來時，要把先前開著的詳情收掉，別留一個對不上網址的面板。
+      // (碼位/字號查詢不在此列——那種查詢本身就會跳進字詳情，交給查詢流程處理。)
+      setSideView('keypad');
+    }
   } else {
     els.counter.textContent = '';
     clearOutput();
@@ -227,9 +246,20 @@ function buildCharChip(char, code, info, chipClass) {
   btn.dataset.tip = tip;
   btn.addEventListener('click', () => {
     copyChar(char, tip);
-    showCharDetail(char, code, info);
+    focusChar(char, code, info);
   });
   return btn;
+}
+
+// 點結果字塊聚焦一個字：打開字詳情，並把它記進網址(c=字)＋歷史棧。
+// 使用者常是即時查詢(未定案、urlSettled=false)途中點字塊的，直接 syncUrl
+// 會 replaceState 蓋掉原查詢；先標記已定案讓這次聚焦走 pushState，「上一頁」
+// 才能退回原查詢的結果列表(比照「查異體字」按鈕的作法)。
+function focusChar(char, code, info) {
+  showCharDetail(char, code, info);
+  focusedChar = char;
+  urlSettled = true;
+  syncUrl(true);
 }
 
 // 結果區的清空一律走這裡：遞增 renderToken 讓 renderHits() 還在排程中的
@@ -484,6 +514,13 @@ function showCharDetail(char, code, info) {
     e.stopPropagation(); // 別冒泡到側欄的「收起條點擊展開」監聽器，否則又被展開
     setSideView('keypad');
     if (isMobile()) setCollapsed(true);
+    // 關掉詳情＝回到結果列表視圖，網址去掉 c。用 replace 原地改寫，不新增
+    // 歷史紀錄——不然「上一頁」又會回到剛關掉的詳情，感覺關不掉。
+    if (focusedChar) {
+      focusedChar = null;
+      urlSettled = false;
+      syncUrl(false);
+    }
   });
   els.charDetail.appendChild(close);
 
@@ -744,6 +781,7 @@ function showBusy(el, text) {
 
 function doSearch(max, { settle = false, sync = true } = {}) {
   const raw = els.input.value;
+  focusedChar = null; // 新查詢＝離開先前聚焦的字，網址不再帶 c
   if (sync) syncUrl(settle);
   const token = ++searchToken;
   if (!raw) {
