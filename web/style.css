@@ -695,6 +695,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .keypad[data-pad='cat'] #radpad-grid,
 .keypad[data-pad='stroke'] #keypad-grid { display: none; }
 
+/* bt.json/舊版 worker 導致部首鍵盤建不起來時，連切換鈕都藏掉，
+   免得使用者切過去看到一片空白(說明文字改在 .pad-note 顯示) */
+.keypad.no-radpad .pad-switch { display: none; }
+
 /* 同一個部首的正形＋附形(人亻、水氵氺)是一組，不要被折行拆散 */
 .radpad-item {
   display: inline-flex;

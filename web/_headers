@@ -1,5 +1,15 @@
+# 字型切片內容永不變動(改版會換版號)，可以長快取
 /webfonts/wfg-fsung/fonts/*
   Cache-Control: public, max-age=31536000, immutable
 
 /webfonts/wfg-fsung/*.css
   Cache-Control: public, max-age=86400
+
+# 程式與資料一律回源驗證(ETag 命中就是 304，成本很低)。app.js/worker.js/data.js
+# 是分開下載的 ES module，只要其中一個被快取成舊版、彼此的介面就對不起來——
+# 部署後真的發生過「新版 app.js + 舊版 worker.js」導致整頁載入失敗的情況。
+/*.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/data/*
+  Cache-Control: public, max-age=0, must-revalidate

@@ -1,4 +1,4 @@
-import { getMoeRefs, findMoeCode } from './data.js';
+import { getMoeRefs, findMoeCode, loadRadicalTable } from './data.js';
 import { parseKeypad, parseRadicalPad } from './keypad.js';
 import { BLOCKS, blockInfo } from './blocks.js';
 import { RADICAL_ENTRIES } from './radicals.js';
@@ -983,10 +983,23 @@ async function main() {
   try {
     // 資料載入與 matcher 建立都在 worker 側(見 worker.js)，這裡只拿
     // 兩種鍵盤佈局(kt/bt)與載入耗時回來
-    const { kt, bt, ms } = await rpc('init');
+    // 部首筆畫鍵盤(bt.json)獨立載入，而且**失敗不影響其他功能**——查詢本身
+    // 完全不依賴它。之前是跟 dt/rt/vt 一起在 worker 的 init 回傳，部署後瀏覽器
+    // 快取到舊版 worker.js(init 只回 kt)，parseRadicalPad(undefined) 一丟例外
+    // 就整個 main() 中止，連查詢都不能用；現在最壞情況只是退回分類鍵盤。
+    const [{ kt, ms }, bt] = await Promise.all([
+      rpc('init'),
+      loadRadicalTable('./data/').catch(() => null),
+    ]);
     buildKeypad(parseKeypad(kt));
-    buildRadicalPad(parseRadicalPad(bt));
-    setPadView('stroke');
+    if (bt && bt.kangxi) {
+      buildRadicalPad(parseRadicalPad(bt));
+      setPadView('stroke');
+    } else {
+      els.keypad.classList.add('no-radpad');
+      setPadView('cat');
+      els.padNote.textContent = '部首筆畫鍵盤載入失敗（data/bt.json 讀不到），已改用部件分類鍵盤；查詢功能不受影響。';
+    }
     els.status.textContent = `資料載入完成（${ms} ms）`;
   } catch (err) {
     els.status.textContent = `資料載入失敗：${err.message}`;

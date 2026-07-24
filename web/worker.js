@@ -3,7 +3,8 @@
 // 每次 debounce 到期就凍一下)；core.js 本來就是純函式、無 DOM 依賴
 // (AGENTS.md 約束 2 的分層)，整個搬進 worker 不需要改動任何演算法。
 // dt/rt/vt 資料與 matcher 只存在 worker 側，主執行緒(app.js)透過訊息 RPC
-// 取得渲染所需的純資料；kt/bt(兩種鍵盤佈局)在 init 時一次交給主執行緒。
+// 取得渲染所需的純資料；kt(部件分類鍵盤佈局)在 init 時一次交給主執行緒
+// (部首筆畫鍵盤的 bt.json 由 app.js 自己載入，見 data.js 的 loadRadicalTable)。
 import { loadData } from './data.js';
 import { createMatcher } from './core.js';
 import { createIndexBuilder } from './qindex.js';
@@ -36,7 +37,7 @@ const boot = (async () => {
   matcher = createMatcher(data.dt, data.rt, data.vt);
   dt = data.dt;
   startIndexBuild(data);
-  return { kt: data.kt, bt: data.bt, ms: Math.round(performance.now() - t0) };
+  return { kt: data.kt, ms: Math.round(performance.now() - t0) };
 })();
 boot.catch(() => {}); // 錯誤在各請求的 await boot 處回報，這裡只防未處理拒絕警告
 

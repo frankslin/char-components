@@ -95,19 +95,29 @@ export async function findMoeCode(code, baseUrl = './data/') {
 
 /**
  * @param {string} baseUrl data/ 目錄的相對或絕對路徑（含結尾斜線）
- * @returns {Promise<{dt: string[], rt: string[], vt: Record<string,string>,
- *                    kt: string[], bt: string[]}>}
+ * @returns {Promise<{dt: string[], rt: string[], vt: Record<string,string>, kt: string[]}>}
  */
 export async function loadData(baseUrl = './data/') {
-  const [dt, rt, vt, kt, bt] = await Promise.all([
+  const [dt, rt, vt, kt] = await Promise.all([
     fetchLines(`${baseUrl}dt.jsonl`),
     fetchLines(`${baseUrl}rt.jsonl`),
     fetchJson(`${baseUrl}vt.json`),
     fetchJson(`${baseUrl}kt.json`),
-    fetchJson(`${baseUrl}bt.json`),
   ]);
   if (dt.length !== rt.length) {
     throw new Error(`dt(${dt.length}) 與 rt(${rt.length}) 筆數不一致，資料可能損毀`);
   }
-  return { dt, rt, vt, kt, bt };
+  return { dt, rt, vt, kt };
+}
+
+/**
+ * 部首筆畫鍵盤表(bt.json)。**刻意由主執行緒自己載入**，不跟 dt/rt/vt/kt 一起
+ * 走 worker 的 init：worker.js 與 app.js 是兩個獨立下載的檔案，部署後瀏覽器/
+ * CDN 只要快取到其中一個的舊版，靠 init 傳鍵盤資料就會對不起來(實際發生過：
+ * 新版 app.js 配舊版 worker.js，init 沒有 bt，整頁「資料載入失敗」)。鍵盤佈局
+ * 跟比對演算法無關，放在主執行緒就沒有這個版本耦合，檔案也只有 1KB。
+ * @returns {Promise<{kangxi: string[], simplified: string[]}>}
+ */
+export async function loadRadicalTable(baseUrl = './data/') {
+  return fetchJson(`${baseUrl}bt.json`);
 }
