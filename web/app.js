@@ -672,6 +672,17 @@ function buildRadicalPad(groups) {
       section.appendChild(item);
     }
 
+    // 筆形部件(kt 的「筆畫」分類：㇒㇄𠃊…)接在部首後面。它們不是部首，但在
+    // 拆分表裡是最基本的葉節點、用量極大(㇒ 就有 1273 個字用到)，只列 214 部首
+    // 的話 1 畫組只剩「一丨丶丿乙亅」六顆，等於把最常用的一批部件擋在門外。
+    if (group.strokeForms.length) {
+      const tag = document.createElement('span');
+      tag.className = 'radpad-subtag';
+      tag.textContent = '筆形';
+      section.appendChild(tag);
+      for (const ch of group.strokeForms) section.appendChild(makeKey(ch, `筆形　${ch}（${group.strokes} 畫）`));
+    }
+
     // 簡化形排在同組的末尾，前面加一個小標籤區隔。它們照**自己的**筆畫數
     // 歸組(马 在 3 畫，不是跟著馬 掛在 10 畫)——使用者是照眼前的字形數筆畫
     // 來找的，掛在繁體正形旁邊等於在 3 畫組裡找不到「马」。
@@ -701,7 +712,7 @@ function setPadView(view) {
   els.padTabCat.setAttribute('aria-selected', String(view === 'cat'));
   els.padTabStroke.setAttribute('aria-selected', String(view === 'stroke'));
   els.padNote.textContent = view === 'stroke'
-    ? '康熙 214 部首依筆畫數排列，簡化形另排在自己的畫數底下（马 在 3 畫、馬 在 10 畫，兩邊都查得到）。找不到的部件可以改用它的部首來組——拆分會遞迴展開，例如「宀厶」一樣查得到「宏」（宏＝宀＋厷，厷＝𠂇＋厶）。'
+    ? '康熙 214 部首依筆畫數排列，另收拆分表用的筆形部件（㇒㇄𠃊…）與簡化形；後兩者都排在各自的畫數底下（马 在 3 畫、馬 在 10 畫，兩邊都查得到）。找不到的部件可以改用它的部首來組——拆分會遞迴展開，例如「宀厶」一樣查得到「宏」（宏＝宀＋厷，厷＝𠂇＋厶）。'
     : '原作者 WFG 為這套拆分表訂的部件分類（字頭、包圍、部首類聚…），收的是拆分表實際用到的部件，只有繁體字形。不確定部件屬於哪一類時，改用「依部首筆畫」。';
   els.panelBody.scrollTop = 0;
 }

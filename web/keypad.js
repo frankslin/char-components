@@ -44,15 +44,22 @@ export function parseKeypad(kt) {
  * 者是照著眼前的字形數筆畫來找的；編號寫在資料裡而不是靠順序，因為它們跟康熙
  * 順序無關。
  *
- * @param {{kangxi: string[], simplified: string[]}} bt data/bt.json 內容
+ * `strokeForms`：每筆是 "<畫數>:<筆形部件們>"，字元直接相連不用逗號（每個字元
+ * 各自是一顆按鍵）。這是 kt.json「筆畫」分類那批筆形部件（㇒㇄𠃊…），它們不是
+ * 部首但在拆分表裡是最基本的葉節點，用量極大。
+ *
+ * @param {{kangxi: string[], simplified: string[], strokeForms: string[]}} bt data/bt.json 內容
  * @returns {{ strokes: number,
  *             radicals: { no: number, forms: string[] }[],
- *             simplified: { no: number, form: string, trad: string }[] }[]}
+ *             simplified: { no: number, form: string, trad: string }[],
+ *             strokeForms: string[] }[]}
  */
 export function parseRadicalPad(bt) {
   const groups = new Map();
   const group = (strokes) => {
-    if (!groups.has(strokes)) groups.set(strokes, { strokes, radicals: [], simplified: [] });
+    if (!groups.has(strokes)) {
+      groups.set(strokes, { strokes, radicals: [], simplified: [], strokeForms: [] });
+    }
     return groups.get(strokes);
   };
   const tradOf = new Map(); // 部首編號 → 正形，給簡化形的說明文字用
@@ -74,6 +81,10 @@ export function parseRadicalPad(bt) {
       const n = Number(token.match(/\d+$/)[0]);
       g.simplified.push({ no: n, form: token.replace(/\d+$/, ''), trad: tradOf.get(n) });
     }
+  }
+  for (const entry of bt.strokeForms || []) {
+    const colon = entry.indexOf(':');
+    group(Number(entry.slice(0, colon))).strokeForms.push(...splitChars(entry.slice(colon + 1)));
   }
   return [...groups.values()].sort((a, b) => a.strokes - b.strokes);
 }
