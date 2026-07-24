@@ -16,7 +16,7 @@ web/
 └── app.js       DOM 組裝：查詢輸入、即時搜尋、部件鍵盤、字詳情(含拆分樹渲染)、字源圖例、結果渲染、複製到剪貼簿
 ```
 
-`web/` 本身沒有任何外部執行期相依（不用 CDN、不用第三方服務）——`data/` 和 `webfonts/` 都是 vendored 進來的副本，整個 `web/` 目錄複製到任何靜態空間都能直接跑。`webfonts/wfg-fsung/` 跟 repo 根目錄的 `webfonts/wfg-fsung/`（那份是給 `wfg-fsung-webfonts` npm 套件用的）內容一致，由 `webfonts/build-wfg-fsung.py` 的 `sync_vendor_copy()` 自動同步；曾經改成指向 unpkg CDN 省掉這份約 80MB 的重複，但 CDN 代理 npm registry 的延遲不穩定，改回本機同源字型。
+`web/` 除了字型之外沒有外部執行期相依：`data/` 是 vendored 進來的副本，程式碼零第三方套件。字型則由 `style.css` 開頭的 `@import` 指向 jsDelivr 上的 `wfg-fsung-webfonts@1.1.0`（版號鎖死）——分片修成真正的 woff2、整包降到約 80MB 之後才進得了 jsDelivr 的 150MB 上限；更早試過的 unpkg 因為代理 npm registry 的延遲不穩定而放棄。`web/webfonts/wfg-fsung/` 的 vendored 副本仍然保留、仍由 `webfonts/build-wfg-fsung.py` 的 `sync_vendor_copy()` 與 repo 根目錄那份（給 npm 套件用的）自動同步，要離線或內網部署時把那行 `@import` 換回 `./webfonts/wfg-fsung/wfg-fsung.css` 就是完全自足的版本。
 
 ## 為什麼不能用 `file://` 雙擊開啟
 

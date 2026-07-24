@@ -1,10 +1,11 @@
-/* 字型是 web/webfonts/wfg-fsung/ 底下的 vendored 副本(跟 repo 根目錄的
-   webfonts/wfg-fsung/ 內容一致，那份是給 wfg-fsung-webfonts npm 套件用
-   的)，不透過 CDN 載入。曾經試過改指向 unpkg CDN(見 git 歷史)，但 unpkg
-   代理 npm registry 的延遲不穩定，體驗不如本機同源字型；vendored 副本
-   讓 web/ 不必依賴任何外部服務就能獨立部署。字型檔案更新時記得同步這份
-   副本，見 webfonts/build-wfg-fsung.py 的 sync_vendor_copy()。 */
-@import url('./webfonts/wfg-fsung/wfg-fsung.css');
+/* 字型走 jsDelivr CDN 的 wfg-fsung-webfonts 套件(版號鎖死，換版時這裡
+   跟著改)。更早曾試過 unpkg，但它代理 npm registry 的延遲不穩定，體驗
+   不如同源字型，所以一度改回 vendored 副本；分片修成真正的 woff2、整包
+   降到 80MB 之後已在 jsDelivr 的 150MB 上限內，改用 jsDelivr 的邊緣節點。
+   web/webfonts/wfg-fsung/ 的 vendored 副本仍由 webfonts/build-wfg-fsung.py
+   的 sync_vendor_copy() 維護，要離線/內網部署時把下面這行換回
+   './webfonts/wfg-fsung/wfg-fsung.css' 即可。 */
+@import url('https://cdn.jsdelivr.net/npm/wfg-fsung-webfonts@1.1.0/wfg-fsung.css');
 
 /* 漢字優先複用系統內建宋體/明體(零下載)，系統字型缺字的碼位由瀏覽器
    逐字回退到 WFG FSung 的 webfont 切片(按 256 碼位分片、用到才下載)——

@@ -72,4 +72,4 @@
 - npm 套件名稱是 `wfg-fsung-webfonts`(不掛在 `@free-fonts` scope 下——那個 scope 現有字型都是 OFL/MIT/CC0 等允許商業散布的授權，跟這套字型的非商業限制性質不同)。**發布到 npm 由使用者本人處理，不要代為執行 `npm publish`**。
 - 這套字型仍是非商業授權(`LicenseRef-WFG-NonCommercial`)，改動 `package.json`/`LICENSE` 時不要移除這個標示，也不要把它加進 `../free-fonts` 的 README/index.html 展示頁(那邊的授權模式不同)。
 - 若 `deps/fonts/` 的字型檔案更新(隨 Unicode 新版本)，需要重跑 `build-wfg-fsung.py` 重新產生切片，不可只更新其中幾個分片檔案，避免新舊版本混雜。
-- **`web/webfonts/wfg-fsung/` 是這裡的 vendored 副本**，供 `web/style.css` 用相對路徑載入，讓 `web/` 不必依賴任何外部 CDN 就能獨立部署(曾經改指向 unpkg CDN，但延遲不穩定，改回本機同源字型)。`build-wfg-fsung.py` 結尾的 `sync_vendor_copy()` 會自動同步這兩份，**不要手動只改其中一份**——兩邊版本不一致會導致難以追查的顯示問題。
+- **`web/webfonts/wfg-fsung/` 是這裡的 vendored 副本**，`build-wfg-fsung.py` 結尾的 `sync_vendor_copy()` 會自動同步這兩份，**不要手動只改其中一份**——兩邊版本不一致會導致難以追查的顯示問題。`web/style.css` 目前是 `@import` jsDelivr 上鎖死版號的 `wfg-fsung-webfonts`(1.0.x 的分片是假 woff2、整包 169MB 超過 jsDelivr 的 150MB 上限，1.1.0 修好後才改過去；更早試過 unpkg，代理 npm registry 的延遲不穩定)；vendored 副本保留做為離線/內網部署的選項，把那行 `@import` 換回相對路徑即可，**改版號時記得兩邊對應的資料版本要一致**。
