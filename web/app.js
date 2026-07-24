@@ -420,15 +420,30 @@ let lastDetail = null;
 
 // 「查異體字」按鈕：以正字號(字號 dash 前的部分)重查——字號查詢本來就會
 // 列出整個字族(正字＋全部異體/附字)，所以只要把正字號塞回輸入框執行查詢。
-// 同一字兼具多重身份、掛在多個字族下時，每個字族一顆按鈕(標籤帶字號區分)。
-function moeFamilyButtons(refs) {
+// 同一字兼具多重身份、掛在多個字族下時，每個字族一顆按鈕。
+//
+// 標籤帶上字族的正字：光看「A00825」沒人認得，寫成「查異體字「壘」A00825」
+// 才知道會查到什麼。正字要另查反向字號表(findMoeCode)，非同步；先用純字號
+// 當佔位標籤畫出來，查回來再補上正字——detail 是呼叫端的 lastDetail 快照，
+// 補之前要確認使用者還停在同一個字的詳情。
+function moeFamilyButtons(refs, detail) {
   const fams = [...new Set(refs.map((r) => r.code.split('-')[0]))];
   return fams.map((code) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'char-detail-link char-detail-action';
-    btn.textContent = fams.length > 1 ? `查異體字 ${code}` : '查異體字';
+    btn.textContent = `查異體字 ${code}`;
+    findMoeCode(code).then((res) => {
+      if (lastDetail !== detail) return;
+      const zheng = res && (res.exact?.char ?? res.family.find((f) => f.code === code)?.char);
+      if (zheng) btn.textContent = `查異體字「${zheng}」${code}`;
+    }).catch(() => {});
     btn.addEventListener('click', () => {
+      // 從字詳情跳去查字族＝一次新的導覽，要能用「上一頁」退回原本的查詢。
+      // 使用者常常是即時查詢(未定案)途中點進詳情的，此時 urlSettled 還是
+      // false，直接 runSearch 會 replaceState 蓋掉原查詢；先標記已定案，
+      // 讓這次跳轉走 pushState、把原查詢留在歷史棧裡。
+      urlSettled = true;
       els.input.value = code;
       runSearch();
     });
@@ -503,7 +518,7 @@ function showCharDetail(char, code, info) {
         const links = document.createElement('div');
         links.className = 'char-detail-links';
         for (const ref of refs) links.appendChild(moeRefLink(ref));
-        links.append(...moeFamilyButtons(refs));
+        links.append(...moeFamilyButtons(refs, detail));
         note.textContent = '此字尚未正式編碼，暫用私有造字區(PUA)碼位，一般外部字典查不到；但它是《教育部異體字字典》的字頭，可由字號直達官網：';
         holder.append(note, links);
       } else {
@@ -530,7 +545,7 @@ function showCharDetail(char, code, info) {
     // 比搜尋更精準(搜尋同形字可能命中多筆或失敗)；查不到就維持原連結
     getMoeRefs(char).then((refs) => {
       if (lastDetail !== detail || !refs) return;
-      moeAnchor.replaceWith(...refs.map(moeRefLink), ...moeFamilyButtons(refs));
+      moeAnchor.replaceWith(...refs.map(moeRefLink), ...moeFamilyButtons(refs, detail));
     });
   }
 
