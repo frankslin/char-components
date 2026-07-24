@@ -6,15 +6,36 @@
 // 取得渲染所需的純資料；kt(鍵盤佈局)在 init 時一次交給主執行緒。
 import { loadData } from './data.js';
 import { createMatcher } from './core.js';
+import { createIndexBuilder } from './qindex.js';
 
 let matcher;
 let dt; // 碼位查詢的「已收錄」判定需要直接驗證 dt 字頭
+let indexMs = null; // 索引建好花了多久(null = 還沒好)
+
+// 啟動後在背景「分塊」建倒排索引(見 qindex.js)。worker 是單執行緒，一口氣
+// 建完會把建表期間到達的查詢全卡在後面，所以每塊只做 12ms 就用 setTimeout(0)
+// 讓出事件迴圈——待處理的 match 訊息會先被派送，走原本的全表掃描回答。
+// 建好之後 getMatch() 自動改走候選路徑，兩者結果一致(索引只縮小候選)。
+function startIndexBuild(data) {
+  const builder = createIndexBuilder(data.dt, data.vt, matcher.getIndex);
+  const t0 = performance.now();
+  const pump = () => {
+    if (builder.step(12)) {
+      matcher.setIndex(builder.result());
+      indexMs = Math.round(performance.now() - t0);
+      return;
+    }
+    setTimeout(pump, 0);
+  };
+  setTimeout(pump, 0);
+}
 
 const boot = (async () => {
   const t0 = performance.now();
   const data = await loadData('./data/');
   matcher = createMatcher(data.dt, data.rt, data.vt);
   dt = data.dt;
+  startIndexBuild(data);
   return { kt: data.kt, ms: Math.round(performance.now() - t0) };
 })();
 boot.catch(() => {}); // 錯誤在各請求的 await boot 處回報，這裡只防未處理拒絕警告
@@ -26,8 +47,10 @@ const ops = {
   match({ query, v, d, u, max }) {
     const t0 = performance.now();
     const hits = matcher.getMatch(query, v, d, u, max);
-    return { hits, elapsed: performance.now() - t0 };
+    return { hits, elapsed: performance.now() - t0, indexed: indexMs !== null };
   },
+  // 索引狀態(除錯/測試用)
+  status: () => ({ indexMs }),
   // 碼位查詢：getIndex() 能換算出下標、該 dt 條目字頭就是這個字才算已收錄
   // (下標 1~10 是 A~J 旗標保留列，排除；11~48 的鍵盤部件是合法目標)。
   codepoint({ cp }) {

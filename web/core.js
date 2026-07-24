@@ -204,36 +204,96 @@ export function createMatcher(dt, rt, vt) {
    * 部件檢索：用部件序列 s 查找符合條件的字。
    * @returns {MatchHit[]}
    */
+  // 倒排索引(快查表)。worker 啟動後在背景建好才掛上來；沒掛上(或這次查詢
+  // 用不上)就走原本的全表掃描，兩條路徑結果必須完全一致。見 qindex.js。
+  let qidx = null;
+  function setIndex(idx) {
+    qidx = idx;
+  }
+
+  // 單列比對。全表掃描與索引候選兩條路徑共用同一份判定，避免兩邊走鐘。
+  function checkRow(i, x, joined, v, d, u, m, out) {
+    if (!dt[i]) return; // 空列＝已抹除的非字元佔位（無字形碼位），不進結果
+    const y = x.concat();
+    let j = 0;
+    let w = dt[i].charAt(j);
+    let c = w.charCodeAt(0);
+    if (c >= 0xD800 && c <= 0xDBFF) {
+      w += dt[i].charAt(++j);
+      c = ((c - 0xD800) << 10) + w.charCodeAt(1) + 0x2400;
+    }
+    const z = getBlock(c);
+    const f = blockFlagFor(z);
+    if (!(blkFlag & f)) return;
+    if (u && f & 0x4000) return;
+    if (filter(w, c, z)) return;
+    let n = 0;
+    if (variant(w, v) !== joined) {
+      n = eliminate(y, dt[i].slice(j + 1), d, v);
+      if (y.length) return;
+    }
+    if (!n || out.length <= m) {
+      out.push({ char: w, code: c, hit: n, block: z });
+    }
+  }
+
+  // 用索引把候選列縮小；回傳 null 代表這次用不上索引(還沒建好、或某個部件
+  // 沒有 posting)，呼叫端退回全表掃描——寧可慢，也不能少給結果。
+  // 回傳順序與全表掃描一致(下標 >=49 在前、1~48 接在最後)。
+  function candidates(x) {
+    if (!qidx || !x.length) return null;
+    const lists = [];
+    for (let k = 0; k < x.length; k++) {
+      const i = getIndex(x[k].codePointAt(0));
+      if (!i) return null;
+      const lo = qidx.postOff[i];
+      const hi = qidx.postOff[i + 1];
+      if (hi <= lo) return null;
+      lists.push(qidx.postFlat.subarray(lo, hi));
+    }
+    lists.sort((a, b) => a.length - b.length); // 先交最短的，交集收斂最快
+    let acc = lists[0];
+    for (let t = 1; t < lists.length && acc.length; t++) {
+      const b = lists[t];
+      const next = new Int32Array(Math.min(acc.length, b.length));
+      let p = 0;
+      let q = 0;
+      let o = 0;
+      while (p < acc.length && q < b.length) {
+        const av = acc[p];
+        const bv = b[q];
+        if (av === bv) {
+          next[o++] = av;
+          p++;
+          q++;
+        } else if (av < bv) p++;
+        else q++;
+      }
+      acc = next.subarray(0, o);
+    }
+    let split = 0;
+    while (split < acc.length && acc[split] < 49) split++;
+    if (split === 0) return acc;
+    const rot = new Int32Array(acc.length);
+    rot.set(acc.subarray(split), 0);
+    rot.set(acc.subarray(0, split), acc.length - split);
+    return rot;
+  }
+
   function getMatch(s, v, d, u, m) {
-    const x = arrayalize(s, v).sort();
+    const x = arrayalize(s, v).sort(); // 會順帶設定 blkFlag
     const joined = x.join('');
     const out = [];
+    const cand = candidates(x);
+    if (cand) {
+      for (let k = 0; k < cand.length; k++) checkRow(cand[k], x, joined, v, d, u, m, out);
+      return out;
+    }
     const l = dt.length;
     const e = l - 48;
     for (let ii = 1; ii < l; ii++) {
       const i = ii < e ? ii + 48 : ii - l + 49;
-      if (!dt[i]) continue; // 空列＝已抹除的非字元佔位（無字形碼位），不進結果
-      const y = x.concat();
-      let j = 0;
-      let w = dt[i].charAt(j);
-      let c = w.charCodeAt(0);
-      if (c >= 0xD800 && c <= 0xDBFF) {
-        w += dt[i].charAt(++j);
-        c = ((c - 0xD800) << 10) + w.charCodeAt(1) + 0x2400;
-      }
-      const z = getBlock(c);
-      const f = blockFlagFor(z);
-      if (!(blkFlag & f)) continue;
-      if (u && f & 0x4000) continue;
-      if (filter(w, c, z)) continue;
-      let n = 0;
-      if (variant(w, v) !== joined) {
-        n = eliminate(y, dt[i].slice(j + 1), d, v);
-        if (y.length) continue;
-      }
-      if (!n || out.length <= m) {
-        out.push({ char: w, code: c, hit: n, block: z });
-      }
+      checkRow(i, x, joined, v, d, u, m, out);
     }
     return out;
   }
@@ -352,5 +412,8 @@ export function createMatcher(dt, rt, vt) {
     return out;
   }
 
-  return { arrayalize, getBlock, getIndex, eliminate, getMatch, exhaust, getTree, getVariant, variant };
+  return {
+    arrayalize, getBlock, getIndex, eliminate, getMatch, exhaust, getTree, getVariant, variant,
+    setIndex,
+  };
 }
