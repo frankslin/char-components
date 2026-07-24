@@ -6,7 +6,7 @@
 
 - **`legacy/部件檢索.htm`**：原作者 WFG 的單一 HTML 檔存檔版本，內含全部漢字拆分資料(`dt`/`rt`/`vt` 三個巨型陣列)與比對演算法(`Eliminate`/`GetMatch`/`Arrayalize`/`Exhaust`/`GetTree`)。**已封存，不再修改**，只做為行為對照的黃金參考版本保留（仍可離線雙擊開啟）。
 - **`web/`**：新實作，取代 `legacy/部件檢索.htm` 做為往後開發的主線。純 ES module + `fetch()`，無 bundler，讀取 `web/data/` 底下抽離出來的資料，演算法(`web/core.js`)是逐句對照 `legacy/部件檢索.htm` 翻譯而成。細節、已驗證行為、目前刻意先不做的功能見 `web/README.md`。
-- **`web/data/`**：從 `legacy/部件檢索.htm` 抽離出來的 `dt`/`rt`/`vt` 三張表(`dt.jsonl`/`rt.jsonl`/`vt.json`)，`web/data/extract.py` 可從 `legacy/部件檢索.htm` 重新產生，`web/data/README.md` 有完整 schema 說明(含 legacy 之外的人工增補清單——重跑 extract.py 後需手動補回)。放在 `web/` 底下是刻意的，讓 `web/` 目錄可以獨立部署。
+- **`web/data/`**：從 `legacy/部件檢索.htm` 抽離出來的 `dt`/`rt`/`vt` 三張表(`dt.jsonl`/`rt.jsonl`/`vt.json`)，`web/data/extract.py` 可從 `legacy/部件檢索.htm` 重新產生，`web/data/README.md` 有完整 schema 說明(含 legacy 之外的人工增補清單——重跑 extract.py 後需手動補回)。放在 `web/` 底下是刻意的，讓 `web/` 目錄可以獨立部署。另有兩份**不是**從 legacy 抽出、`extract.py` 也不會覆寫的資料：`bt.json`(康熙 214 部首依筆畫排列，側邊鍵盤第二種排列用)與 `moe/`(教育部異體字字典字號對照表分片)。
 - 背景與演算法原理見 `doc/blog/`(原作者部落格文章逐字備份，01~13)與 `doc/04`。**動手改演算法前必讀 `doc/04-開發理解與重構指引.md`**，尤其是「拆分樹比對法」與「異體映射」章節——這兩塊最容易改錯。
 - `LICENSE` 是原作者的公開授權條款，禁止商業使用；任何衍生產出物需保留來源標示。
 

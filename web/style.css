@@ -650,6 +650,72 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .char-detail-action:hover { filter: brightness(1.08); }
 
+/* 鍵盤排列方式的切換(部件分類／部首筆畫)。做成跟側欄頁籤同一套分段控件的
+   視覺語言，但層級低一階(尺寸小一號)：它切的是鍵盤內部的排列，不是換面板。
+   sticky 貼在捲動容器頂端——鍵盤很長，捲到下面時還要能換一種排法。 */
+.pad-switch {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  gap: 2px;
+  background: var(--bg);
+  padding: 0.35rem 0;
+  margin-bottom: 0.15rem;
+}
+
+.pad-tab {
+  flex: 1 1 0;
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.pad-tab:hover { border-color: var(--border-strong); }
+.pad-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.pad-note {
+  margin: 0 0 0.4rem;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.keypad[data-pad='cat'] #radpad-grid,
+.keypad[data-pad='stroke'] #keypad-grid { display: none; }
+
+/* 同一個部首的正形＋附形(人亻、水氵氺)是一組，不要被折行拆散 */
+.radpad-item {
+  display: inline-flex;
+  gap: 0;
+  white-space: nowrap;
+  margin-right: 0.3rem;
+}
+
+.keypad-key-alt { color: var(--muted); }
+
+/* 畫數組末尾的「簡化」小標籤：比分類標籤弱一階(無底色)，只做區隔用 */
+.radpad-subtag {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  padding: 0.1rem 0.3rem;
+  margin: 0 0.25rem 0 0.15rem;
+  white-space: nowrap;
+}
+
 .keypad-cat {
   display: flex;
   flex-wrap: wrap;
@@ -768,6 +834,8 @@ footer a:hover { text-decoration: underline; }
     padding: 0.45rem 0.55rem;
   }
   .keypad-cat { gap: 4px; padding: 0.3rem 0; }
+  /* 抽屜很矮，排列方式的切換也要撐到好按的觸控目標 */
+  .pad-tab { padding: 0.62rem 0.5rem; font-size: 14px; }
 }
 
 /* 觸屏裝置沒有 hover，tooltip 只會在點按時閃一下，直接停用

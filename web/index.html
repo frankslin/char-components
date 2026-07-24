@@ -54,8 +54,14 @@
       <button id="toggle-panel" type="button" class="btn-ghost" title="收起/展開">收起</button>
     </div>
     <div class="panel-body" id="panel-body">
-      <div class="keypad" id="keypad">
+      <div class="keypad" id="keypad" data-pad="stroke">
+        <div class="pad-switch" role="tablist" aria-label="鍵盤排列方式">
+          <button class="pad-tab active" id="pad-tab-stroke" type="button" role="tab" aria-selected="true">依部首筆畫</button>
+          <button class="pad-tab" id="pad-tab-cat" type="button" role="tab" aria-selected="false">WFG 漢字部件分類法</button>
+        </div>
+        <p class="pad-note" id="pad-note"></p>
         <div class="keypad-grid" id="keypad-grid"></div>
+        <div class="keypad-grid" id="radpad-grid"></div>
       </div>
       <div class="char-detail" id="char-detail">
         <p class="char-detail-empty">點擊任一個查詢結果查看詳情</p>

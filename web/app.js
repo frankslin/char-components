@@ -1,5 +1,5 @@
 import { getMoeRefs, findMoeCode } from './data.js';
-import { parseKeypad } from './keypad.js';
+import { parseKeypad, parseRadicalPad } from './keypad.js';
 import { BLOCKS, blockInfo } from './blocks.js';
 import { RADICAL_ENTRIES } from './radicals.js';
 
@@ -89,7 +89,12 @@ const els = {
   toast: document.getElementById('toast'),
   legend: document.getElementById('legend'),
   tooltip: document.getElementById('tooltip'),
+  keypad: document.getElementById('keypad'),
   keypadGrid: document.getElementById('keypad-grid'),
+  radpadGrid: document.getElementById('radpad-grid'),
+  padNote: document.getElementById('pad-note'),
+  padTabCat: document.getElementById('pad-tab-cat'),
+  padTabStroke: document.getElementById('pad-tab-stroke'),
   sidePanel: document.getElementById('side-panel'),
   togglePanel: document.getElementById('toggle-panel'),
   sideTabKeypad: document.getElementById('side-tab-keypad'),
@@ -603,6 +608,20 @@ function buildLegend() {
 // 所有分類一次全部列出，不切換分頁。每個分類是一條 flex-wrap 的「文字流」：
 // 分類名稱做成行內的小標籤，後面直接跟著該分類全部按鍵，讓內容盡量密集地
 // 折行往下排，配合較小的按鍵尺寸，一屏能看到的部件數量最大化。
+function makeKey(ch, tip) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'keypad-key';
+  if (isPua(ch.codePointAt(0))) btn.classList.add('pua-char');
+  if (tip) btn.dataset.tip = tip;
+  btn.textContent = ch;
+  btn.addEventListener('click', () => {
+    insertAtCursor(els.input, ch);
+    scheduleLiveSearch();
+  });
+  return btn;
+}
+
 function buildKeypad(categories) {
   els.keypadGrid.replaceChildren();
   const frag = document.createDocumentFragment();
@@ -615,21 +634,76 @@ function buildKeypad(categories) {
     title.textContent = cat.name;
     section.appendChild(title);
 
-    for (const ch of cat.rows.flat()) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'keypad-key';
-      if (isPua(ch.codePointAt(0))) btn.classList.add('pua-char');
-      btn.textContent = ch;
-      btn.addEventListener('click', () => {
-        insertAtCursor(els.input, ch);
-        scheduleLiveSearch();
-      });
-      section.appendChild(btn);
-    }
+    for (const ch of cat.rows.flat()) section.appendChild(makeKey(ch));
     frag.appendChild(section);
   }
   els.keypadGrid.appendChild(frag);
+}
+
+// 第二種鍵盤：214 個康熙部首依筆畫數排列(data/bt.json)。原本只有「部件分類」
+// 一種鍵盤，使用者回報想要的部件不知道屬於哪一類就找不到(例如「厷」)；部首表
+// 是使用者從紙本字典就熟悉的索引方式，畫數是查得到的客觀屬性，不必猜分類。
+// 排版沿用分類鍵盤的「文字流」：畫數當行內小標籤，後面接該畫數的全部部首。
+// 同一個部首的正形與附形(人亻、水氵氺)包在一個 .radpad-item 裡不被拆行，
+// 附形用較淡的顏色，跟正形在視覺上分得開。
+function buildRadicalPad(groups) {
+  els.radpadGrid.replaceChildren();
+  const frag = document.createDocumentFragment();
+  for (const group of groups) {
+    const section = document.createElement('div');
+    section.className = 'keypad-cat';
+
+    const title = document.createElement('span');
+    title.className = 'keypad-cat-name';
+    title.textContent = `${group.strokes} 畫`;
+    section.appendChild(title);
+
+    for (const rad of group.radicals) {
+      const item = document.createElement('span');
+      item.className = 'radpad-item';
+      rad.forms.forEach((form, i) => {
+        const tip = i === 0
+          ? `部首 ${rad.no}　${form}（${group.strokes} 畫）`
+          : `部首 ${rad.no}　${form}（${rad.forms[0]} 的附形）`;
+        const key = makeKey(form, tip);
+        if (i > 0) key.classList.add('keypad-key-alt');
+        item.appendChild(key);
+      });
+      section.appendChild(item);
+    }
+
+    // 簡化形排在同組的末尾，前面加一個小標籤區隔。它們照**自己的**筆畫數
+    // 歸組(马 在 3 畫，不是跟著馬 掛在 10 畫)——使用者是照眼前的字形數筆畫
+    // 來找的，掛在繁體正形旁邊等於在 3 畫組裡找不到「马」。
+    if (group.simplified.length) {
+      const tag = document.createElement('span');
+      tag.className = 'radpad-subtag';
+      tag.textContent = '簡化';
+      section.appendChild(tag);
+      for (const rad of group.simplified) {
+        const key = makeKey(rad.form, `部首 ${rad.no} ${rad.trad} 的簡化形　${rad.form}（${group.strokes} 畫）`);
+        section.appendChild(key);
+      }
+    }
+    frag.appendChild(section);
+  }
+  els.radpadGrid.appendChild(frag);
+}
+
+// 兩種鍵盤的切換。預設是「依部首筆畫」——畫數是查得到的客觀屬性，不必猜
+// 部件屬於哪一類(部件分類鍵盤找不到東西正是使用者回報的問題)。刻意不記憶
+// 選擇(整個 web/ 目前都沒有 localStorage，見 web/README.md 的「刻意先不做」
+// 清單)，重新整理會回到部首筆畫。
+function setPadView(view) {
+  els.keypad.dataset.pad = view;
+  els.padTabCat.classList.toggle('active', view === 'cat');
+  els.padTabStroke.classList.toggle('active', view === 'stroke');
+  els.padTabCat.setAttribute('aria-selected', String(view === 'cat'));
+  els.padTabStroke.setAttribute('aria-selected', String(view === 'stroke'));
+  els.padNote.textContent = view === 'stroke'
+    ? '康熙 214 部首依筆畫數排列，簡化形另排在自己的畫數底下（马 在 3 畫、馬 在 10 畫，兩邊都查得到）。找不到的部件可以改用它的部首來組——拆分會遞迴展開，例如「宀厶」一樣查得到「宏」（宏＝宀＋厷，厷＝𠂇＋厶）。'
+    : '原作者 WFG 為這套拆分表訂的部件分類（字頭、包圍、部首類聚…），收的是拆分表實際用到的部件，只有繁體字形。不確定部件屬於哪一類時，改用「依部首筆畫」。';
+  els.panelBody.scrollTop = 0;
 }
 
 let composing = false;
@@ -908,9 +982,11 @@ async function main() {
   showBusy(els.status, '資料載入中（約 4MB，第一次開啟需要一點時間）…');
   try {
     // 資料載入與 matcher 建立都在 worker 側(見 worker.js)，這裡只拿
-    // 鍵盤佈局(kt)與載入耗時回來
-    const { kt, ms } = await rpc('init');
+    // 兩種鍵盤佈局(kt/bt)與載入耗時回來
+    const { kt, bt, ms } = await rpc('init');
     buildKeypad(parseKeypad(kt));
+    buildRadicalPad(parseRadicalPad(bt));
+    setPadView('stroke');
     els.status.textContent = `資料載入完成（${ms} ms）`;
   } catch (err) {
     els.status.textContent = `資料載入失敗：${err.message}`;
@@ -974,6 +1050,8 @@ async function main() {
     if (e.key === 'Escape') clearInput();
   });
   els.clear.addEventListener('click', clearInput);
+  els.padTabCat.addEventListener('click', () => setPadView('cat'));
+  els.padTabStroke.addEventListener('click', () => setPadView('stroke'));
   els.sideTabKeypad.addEventListener('click', () => setSideView('keypad'));
   els.sideTabDetail.addEventListener('click', () => setSideView('detail'));
   // 展開時只有「收起」小按鈕會觸發收合(面板本體是鍵盤,不能整塊都是開關)；

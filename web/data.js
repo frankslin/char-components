@@ -95,17 +95,19 @@ export async function findMoeCode(code, baseUrl = './data/') {
 
 /**
  * @param {string} baseUrl data/ 目錄的相對或絕對路徑（含結尾斜線）
- * @returns {Promise<{dt: string[], rt: string[], vt: Record<string,string>, kt: string[]}>}
+ * @returns {Promise<{dt: string[], rt: string[], vt: Record<string,string>,
+ *                    kt: string[], bt: string[]}>}
  */
 export async function loadData(baseUrl = './data/') {
-  const [dt, rt, vt, kt] = await Promise.all([
+  const [dt, rt, vt, kt, bt] = await Promise.all([
     fetchLines(`${baseUrl}dt.jsonl`),
     fetchLines(`${baseUrl}rt.jsonl`),
     fetchJson(`${baseUrl}vt.json`),
     fetchJson(`${baseUrl}kt.json`),
+    fetchJson(`${baseUrl}bt.json`),
   ]);
   if (dt.length !== rt.length) {
     throw new Error(`dt(${dt.length}) 與 rt(${rt.length}) 筆數不一致，資料可能損毀`);
   }
-  return { dt, rt, vt, kt };
+  return { dt, rt, vt, kt, bt };
 }
